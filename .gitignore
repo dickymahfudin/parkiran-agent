@@ -1,0 +1,15 @@
+node_modules/
+dist/
+.env
+logs/
+.parkiran/
+.DS_Store
+*.log
+
+# Raw downloads and Blender outputs (rebuild: bun run assets)
+assets/raw/
+assets/generated/
+
+# Generated web assets (rebuild: bun run assets)
+web/public/assets/
+web/public/basis/
