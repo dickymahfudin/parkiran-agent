@@ -1,0 +1,9 @@
+{
+  "name": "@parkiran/server",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "bun src/index.ts",
+    "dev": "bun --watch src/index.ts"
+  }
+}
