@@ -1,0 +1,82 @@
+// Brain clip → rigged clip, and brain time → clip time. Pure, so the mapping is unit tested.
+import { WALK_SPEED } from "../layout.ts";
+import type { Clip } from "./brain.ts";
+
+export interface ClipMeta {
+  loop: boolean;
+  seconds: number;
+}
+
+export interface ClipsJson {
+  fps: number;
+  clips: Record<string, ClipMeta & { source: string; base?: string }>;
+  /** Hips of the seated pose relative to the character root (glTF: Y up, facing +Z). */
+  sitHips: [number, number, number];
+  /** Ground speed of the planted foot in the walk clip, m/s. */
+  walkSpeed: number;
+  /** Mouth position in the bind pose (Blender coordinates: Z up, facing −Y). */
+  mouth: [number, number, number];
+}
+
+/** Either one full-body clip, or legs from one clip and everything above the hips from another. */
+export type RigPlay = { full: string } | { lower: string; upper: string };
+
+const SEATED: Partial<Record<Clip, string>> = {
+  think: "think",
+  smoke: "smoke",
+  sip: "sip",
+  chat: "chat",
+  frustrated: "frustrated",
+  lightUp: "lightUp",
+  phone: "phone",
+};
+const STANDING: Partial<Record<Clip, string>> = {
+  think: "smokeStand",
+  smoke: "smokeStand",
+  sip: "sipStand",
+  chat: "talk",
+  frustrated: "frustratedStand",
+  lightUp: "lightUpStand",
+  phone: "phoneStand",
+};
+const ALWAYS: Partial<Record<Clip, string>> = {
+  walk: "walk",
+  standIdle: "standIdle",
+  sitDown: "sitDown",
+  standUp: "standUp",
+  sitIdle: "sitIdle",
+  type: "type",
+  stretch: "stretch",
+  patPockets: "patPockets",
+  lookAround: "lookAround",
+  drag: "drag",
+  sigh: "sigh",
+  pocketCig: "pocketCig",
+  doze: "doze",
+  buy: "interact",
+  stubOut: "stubOut",
+  closeLaptop: "closeLaptop",
+  wave: "wave",
+};
+
+export function rigPlay(clip: Clip, seated: boolean): RigPlay {
+  const name = (seated ? SEATED[clip] : STANDING[clip]) ?? ALWAYS[clip];
+  if (!name) throw new Error(`no rig clip for ${clip}`);
+  // The stretch was keyed seated; a seatless character stretches from the waist up while standing.
+  if (clip === "stretch" && !seated) return { lower: "standIdle", upper: "stretch" };
+  return { full: name };
+}
+
+/** Clip-local time for a brain clip that has been playing `t` seconds. */
+export function rigTime(name: string, t: number, meta: ClipsJson, typingRate: number): number {
+  const m = meta.clips[name];
+  if (!m) throw new Error(`clip ${name} missing from clips.json`);
+  let scaled = t;
+  if (name === "walk") scaled = t * (WALK_SPEED / meta.walkSpeed);
+  else if (name === "type") scaled = t * typingRate;
+  if (m.loop) return ((scaled % m.seconds) + m.seconds) % m.seconds;
+  return Math.min(scaled, m.seconds - 1e-3);
+}
+
+/** Where the seated hips are relative to the root, along the facing direction (m). */
+export const sitHipsBack = (meta: ClipsJson): number => -meta.sitHips[2];

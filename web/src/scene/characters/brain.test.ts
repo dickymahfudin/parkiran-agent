@@ -1,0 +1,259 @@
+import { describe, expect, test } from "bun:test";
+import { COUNTER, SEAT_PLACES } from "../layout.ts";
+import { Brain, type Clip, type Frame, type Home, type Target } from "./brain.ts";
+
+const seat = SEAT_PLACES["bench-1a"]!;
+const home: Home = { point: seat.approach, yaw: seat.yaw, node: seat.node, seat: { hip: seat.hip, style: seat.style } };
+const WORK: Target = { kind: "seated", activity: "work", work: "bash" };
+const stoolSeat = SEAT_PLACES["stool-2"]!;
+const stool: Home = { point: stoolSeat.approach, yaw: stoolSeat.yaw, node: stoolSeat.node, seat: { hip: stoolSeat.hip, style: stoolSeat.style } };
+
+function runFor(brain: Brain, seconds: number, onFrame?: (f: Frame) => void): { clips: Set<Clip>; last: Frame } {
+  const clips = new Set<Clip>();
+  let last!: Frame;
+  for (let t = 0; t < seconds; t += 1 / 30) {
+    last = brain.update(1 / 30, 0);
+    clips.add(last.clip);
+    onFrame?.(last);
+  }
+  return { clips, last };
+}
+
+function seatedBrain(target: Target = WORK): Brain {
+  const b = new Brain({ seed: 42, home, atHome: true, target });
+  b.setTarget(target, null, 0);
+  runFor(b, 0.5);
+  return b;
+}
+
+describe("Brain", () => {
+  test("walks in from the street and sits down to work", () => {
+    const b = new Brain({ seed: 1, home, atHome: false, target: WORK });
+    b.setTarget(WORK, null, 0);
+    const { clips, last } = runFor(b, 30);
+    expect(clips.has("walk")).toBe(true);
+    expect(clips.has("sitDown")).toBe(true);
+    expect(b.state.posture).toBe("seated");
+    expect(last).toMatchObject({ clip: "type", sit: 1, visible: true });
+    expect(last.props.laptop).toBe("open");
+    expect(Math.hypot(last.x - seat.approach[0], last.z - seat.approach[1])).toBeLessThan(0.01);
+  });
+
+  test("walking in while the session keeps changing state: never turns back, same route as a quiet arrival", () => {
+    const walked = (flip: boolean) => {
+      const b = new Brain({ seed: 1, home, atHome: false, target: WORK });
+      b.setTarget(WORK, null, 0);
+      let distance = 0;
+      let prev: Frame | null = null;
+      let t = 0;
+      runFor(b, 30, (f) => {
+        t += 1 / 30;
+        // Thinking ↔ tool calls every 0.4 s, as the first seconds of a real session do.
+        if (flip && Math.floor(t / 0.4) % 2 === 1) b.setTarget({ kind: "seated", activity: "work", work: "think" }, null, t);
+        else if (flip) b.setTarget(WORK, null, t);
+        if (prev?.visible && f.visible) distance += Math.hypot(f.x - prev.x, f.z - prev.z);
+        prev = f;
+      });
+      return { distance, state: b.state.posture };
+    };
+    const quiet = walked(false);
+    const busy = walked(true);
+    expect(busy.state).toBe("seated");
+    expect(busy.distance).toBeCloseTo(quiet.distance, 1);
+  });
+
+  test("starts seated on page load", () => {
+    const b = seatedBrain();
+    expect(b.state.posture).toBe("seated");
+    expect(b.update(1 / 30, 0).clip).toBe("type");
+  });
+
+  test("needs korek: stands up with an unlit cigarette and a lighter bubble, pats pockets and looks around", () => {
+    const b = seatedBrain();
+    b.setTarget({ kind: "needs", need: "permission" }, null, 1);
+    const { clips, last } = runFor(b, 8);
+    expect(b.state.posture).toBe("standing");
+    expect(clips.has("standUp") && clips.has("patPockets") && clips.has("lookAround")).toBe(true);
+    expect(last.props).toMatchObject({ cigarette: "unlit", bubble: "permission" });
+  });
+
+  test("approved: the lighter flame shows, the cigarette gets lit, sits back to work", () => {
+    const b = seatedBrain();
+    b.setTarget({ kind: "needs", need: "permission" }, null, 1);
+    runFor(b, 5);
+    b.setTarget(WORK, { kind: "approved", at: 2 }, 2);
+    let flame = false;
+    const { clips, last } = runFor(b, 8, (f) => (flame ||= f.props.flame));
+    expect(flame).toBe(true);
+    expect(clips.has("lightUp") && clips.has("drag") && clips.has("sitDown")).toBe(true);
+    expect(last.props).toMatchObject({ cigarette: "lit", bubble: null });
+    expect(last.clip).toBe("type");
+  });
+
+  test("denied: sighs, puts the cigarette back, sits down", () => {
+    const b = seatedBrain();
+    b.setTarget({ kind: "needs", need: "permission" }, null, 1);
+    runFor(b, 5);
+    b.setTarget(WORK, { kind: "denied", at: 2 }, 2);
+    const { clips, last } = runFor(b, 8);
+    expect(clips.has("sigh") && clips.has("pocketCig")).toBe(true);
+    expect(clips.has("lightUp")).toBe(false);
+    expect(last.props.cigarette).toBe("none");
+    expect(b.state.posture).toBe("seated");
+  });
+
+  test("compaction, no warung stool free: buys kopi at the window, drinks it back on its own seat", () => {
+    const b = seatedBrain();
+    b.setTarget({ kind: "warung" }, null, 1);
+    let atWindow = false;
+    const trip = runFor(b, 40, (f) => {
+      if (f.clip === "buy") atWindow ||= Math.hypot(f.x - COUNTER.point[0], f.z - COUNTER.point[1]) < 0.05;
+    });
+    expect(atWindow).toBe(true);
+    expect(trip.clips.has("sip")).toBe(true);
+    expect(b.state.posture).toBe("seated");
+    expect(trip.last.props).toMatchObject({ cup: true, laptop: "closed" });
+    expect(Math.hypot(trip.last.x - seat.approach[0], trip.last.z - seat.approach[1])).toBeLessThan(0.01);
+    b.setTarget(WORK, null, 2);
+    const back = runFor(b, 8);
+    expect(back.last.props).toMatchObject({ cup: false, laptop: "open" });
+    expect(back.last.clip).toBe("type");
+  });
+
+  test("compaction with a free warung stool: drinks the kopi there, then walks home to work", () => {
+    const b = seatedBrain();
+    b.setTarget({ kind: "warung" }, null, 1);
+    b.setVisit(stool);
+    const trip = runFor(b, 40);
+    expect(trip.clips.has("buy") && trip.clips.has("sip")).toBe(true);
+    expect(b.state.posture).toBe("seated");
+    expect(trip.last).toMatchObject({ sit: 1, seatStyle: "stool", seatY: stoolSeat.hip[1] });
+    expect(Math.hypot(trip.last.x - stool.point[0], trip.last.z - stool.point[1])).toBeLessThan(0.01);
+    b.setTarget(WORK, null, 2);
+    const back = runFor(b, 30);
+    expect(back.clips.has("standUp") && back.clips.has("sitDown")).toBe(true);
+    expect(back.last).toMatchObject({ clip: "type", seatStyle: "bench", sit: 1 });
+    expect(Math.hypot(back.last.x - seat.approach[0], back.last.z - seat.approach[1])).toBeLessThan(0.01);
+  });
+
+  test("a warung stool taken back mid-break sends the drinker home with the cup", () => {
+    const b = seatedBrain();
+    b.setTarget({ kind: "warung" }, null, 1);
+    b.setVisit(stool);
+    runFor(b, 40);
+    b.setVisit(null);
+    const moved = runFor(b, 30);
+    expect(moved.clips.has("standUp")).toBe(true);
+    expect(moved.last).toMatchObject({ seatStyle: "bench", sit: 1 });
+    expect(moved.last.props.cup).toBe(true);
+  });
+
+  test("a tab hidden through a coffee break settles straight onto the warung stool with the cup", () => {
+    const b = seatedBrain();
+    b.setTarget({ kind: "warung" }, null, 1);
+    b.setVisit(stool);
+    b.settle();
+    const f = b.update(1 / 30, 0);
+    expect(f).toMatchObject({ sit: 1, seatStyle: "stool" });
+    expect(f.props.cup).toBe(true);
+  });
+
+  test("tool failure plays a frustrated gesture, then back to typing", () => {
+    const b = seatedBrain();
+    b.react("failure");
+    const { clips, last } = runFor(b, 4);
+    expect(clips.has("frustrated")).toBe(true);
+    expect(last.clip).toBe("type");
+  });
+
+  test("dozes with Zzz, wakes when work resumes", () => {
+    const b = seatedBrain({ kind: "seated", activity: "doze" });
+    expect(runFor(b, 1).last.props.zzz).toBe(true);
+    b.setTarget(WORK, null, 1);
+    const { last } = runFor(b, 1);
+    expect(last.props.zzz).toBe(false);
+    expect(last.clip).toBe("type");
+  });
+
+  test("idle: shuts the laptop, lights up and scrolls the phone, cigarette in hand; work brings the laptop back", () => {
+    const b = seatedBrain({ kind: "seated", activity: "idle" });
+    const { clips, last } = runFor(b, 20);
+    expect(clips.has("closeLaptop") && clips.has("lightUp")).toBe(true);
+    expect(last.clip).toBe("phone");
+    expect(last.props).toMatchObject({ laptop: "closed", phone: true, cigarette: "lit" });
+    b.setTarget(WORK, null, 21);
+    const back = runFor(b, 2).last;
+    expect(back.clip).toBe("type");
+    expect(back.props).toMatchObject({ laptop: "open", phone: false, cigarette: "mouth" });
+  });
+
+  test("idle without a seat: phone in hand, cigarette in the lips (the other hand carries the laptop)", () => {
+    const standing: Home = { point: [1.3, 3.6], yaw: -0.5, node: "frontE", seat: null };
+    const b = new Brain({ seed: 9, home: standing, atHome: true, target: { kind: "seated", activity: "idle" } });
+    b.setTarget({ kind: "seated", activity: "idle" }, null, 0);
+    const { last } = runFor(b, 10);
+    expect(last.clip).toBe("phone");
+    expect(last.props).toMatchObject({ phone: true, cigarette: "mouth" });
+  });
+
+  test("dozing off shuts the laptop", () => {
+    const b = seatedBrain({ kind: "seated", activity: "doze" });
+    const { clips, last } = runFor(b, 6);
+    expect(clips.has("closeLaptop")).toBe(true);
+    expect(last).toMatchObject({ clip: "doze" });
+    expect(last.props).toMatchObject({ laptop: "closed", zzz: true, phone: false });
+  });
+
+  test("leaving: closes the laptop, stands, walks off and is done", () => {
+    const b = seatedBrain();
+    b.setTarget({ kind: "gone" }, null, 1);
+    const { clips } = runFor(b, 40);
+    expect(clips.has("closeLaptop") && clips.has("standUp") && clips.has("walk")).toBe(true);
+    expect(b.done).toBe(true);
+  });
+
+  test("thinking: lights up, types with one hand and smokes with the other; real work moves the cigarette to the lips", () => {
+    const b = seatedBrain({ kind: "seated", activity: "work", work: "think" });
+    const { clips, last } = runFor(b, 6);
+    expect(clips.has("lightUp") && clips.has("think")).toBe(true);
+    expect(last.clip).toBe("think");
+    expect(last.props.cigarette).toBe("lit");
+    b.setTarget(WORK, null, 7);
+    const after = runFor(b, 2).last;
+    expect(after.clip).toBe("type");
+    expect(after.props.cigarette).toBe("mouth");
+    b.setTarget({ kind: "needs", need: "permission" }, null, 9);
+    expect(runFor(b, 3).last.props.cigarette).toBe("unlit");
+  });
+
+  test("a status change while turning to the seat still ends seated on the seat, facing forward", () => {
+    // A new session walks in; its status flips (prompt → thinking → bash) right as it turns to sit down.
+    const b = new Brain({ seed: 3, home, atHome: false, target: WORK });
+    b.setTarget(WORK, null, 0);
+    let t = 0;
+    while (b.state.step !== "turn" && t < 60) {
+      b.update(1 / 30, 0);
+      t += 1 / 30;
+    }
+    expect(b.state.step).toBe("turn");
+    b.setTarget({ kind: "seated", activity: "work", work: "think" }, null, 1);
+    const { last } = runFor(b, 10);
+    expect(b.state.posture).toBe("seated");
+    expect(last.yaw).toBeCloseTo(seat.yaw, 3);
+    expect(Math.hypot(last.x - seat.approach[0], last.z - seat.approach[1])).toBeLessThan(0.01);
+  });
+
+  test("asked for permission on the way in: after the lighter it walks on to the seat instead of sitting mid-path", () => {
+    const b = new Brain({ seed: 5, home, atHome: false, target: WORK });
+    b.setTarget(WORK, null, 0);
+    while (b.state.step !== "walk") b.update(1 / 30, 0);
+    runFor(b, 2);
+    b.setTarget({ kind: "needs", need: "permission" }, null, 1);
+    runFor(b, 5);
+    b.setTarget(WORK, { kind: "approved", at: 2 }, 2);
+    const { last } = runFor(b, 40);
+    expect(b.state.posture).toBe("seated");
+    expect(last.yaw).toBeCloseTo(seat.yaw, 3);
+    expect(Math.hypot(last.x - seat.approach[0], last.z - seat.approach[1])).toBeLessThan(0.01);
+  });
+});
