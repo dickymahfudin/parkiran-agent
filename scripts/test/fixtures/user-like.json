@@ -1,0 +1,54 @@
+{
+  "includeCoAuthoredBy": false,
+  "permissions": {
+    "allow": [
+      "mcp__postgres__pg_query",
+      "Bash(git status:*)"
+    ],
+    "deny": []
+  },
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Grep|Glob|Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node '/Users/example/.claude/hooks/other/hook.cjs'",
+            "timeout": 10,
+            "statusMessage": "Enriching..."
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node '/Users/example/.claude/hooks/other/hook.cjs'",
+            "timeout": 10
+          }
+        ]
+      }
+    ]
+  },
+  "enabledPlugins": {
+    "context-mode@context-mode": true
+  },
+  "mcpServers": {
+    "codegraph": {
+      "type": "stdio",
+      "command": "/Users/example/bin/codegraph",
+      "args": [
+        "serve",
+        "--mcp"
+      ],
+      "env": {
+        "PATH": "/usr/bin:/bin",
+        "EMOJI": "korek 🔥 é"
+      }
+    }
+  }
+}
