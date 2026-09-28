@@ -1,6 +1,6 @@
 import { timingSafeEqual } from "node:crypto";
 import { existsSync, statSync } from "node:fs";
-import { join, normalize, sep } from "node:path";
+import { extname, join, normalize, sep } from "node:path";
 import type { ServerWebSocket } from "bun";
 import { parseIngestEvent } from "../../shared/src/events.ts";
 import type { ServerMessage } from "../../shared/src/protocol.ts";
@@ -73,7 +73,7 @@ export function createApp({ config, store, usage, log }: AppDeps) {
         }
 
         if (req.method === "GET" && config.staticDir && existsSync(config.staticDir)) {
-          return serveStatic(config.staticDir, url.pathname);
+          return serveStatic(config.staticDir, url.pathname, req.headers.get("if-none-match"));
         }
         return text(404, "not found");
       } catch (err) {
@@ -117,10 +117,29 @@ export function createApp({ config, store, usage, log }: AppDeps) {
   };
 }
 
-function serveStatic(root: string, pathname: string): Response {
+/** Vite's content-hashed build output (`assets/name-hash.js|css`): a new build gets new names, so it never goes stale. */
+const HASHED_BUILD_FILE = /^assets\/[^/]+-[A-Za-z0-9_-]{8}\.(?:js|css)$/;
+
+/**
+ * Hashed build files are cached for good; everything else (index.html, the models and textures, whose names stay the
+ * same across rebuilds) is revalidated on every load against an ETag, so a rebuild is picked up on the next refresh
+ * instead of an old index.html asking for chunks the rebuild deleted.
+ */
+function serveStatic(root: string, pathname: string, ifNoneMatch: string | null): Response {
   const rel = normalize(decodeURIComponent(pathname)).replace(/^[/\\]+/, "");
   const full = join(root, rel);
   if (!full.startsWith(root + sep) && full !== root) return text(403, "forbidden");
-  const file = existsSync(full) && statSync(full).isFile() ? full : join(root, "index.html");
-  return existsSync(file) ? new Response(Bun.file(file)) : text(404, "not found");
+  if (existsSync(full) && statSync(full).isFile()) return fileResponse(full, HASHED_BUILD_FILE.test(rel), ifNoneMatch);
+  // A missing file is a 404, not the app page: a script import answered with HTML fails with a confusing error.
+  if (extname(rel) !== "") return text(404, "not found");
+  const index = join(root, "index.html");
+  return existsSync(index) ? fileResponse(index, false, ifNoneMatch) : text(404, "not found");
+}
+
+function fileResponse(path: string, immutable: boolean, ifNoneMatch: string | null): Response {
+  const st = statSync(path);
+  const etag = `W/"${st.size.toString(16)}-${Math.floor(st.mtimeMs).toString(16)}"`;
+  const headers = { etag, "cache-control": immutable ? "public, max-age=31536000, immutable" : "no-cache" };
+  if (ifNoneMatch === etag) return new Response(null, { status: 304, headers });
+  return new Response(Bun.file(path), { headers });
 }

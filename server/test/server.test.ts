@@ -1,4 +1,7 @@
 import { afterAll, describe, expect, test } from "bun:test";
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import type { IngestEvent } from "../../shared/src/events.ts";
 import type { ServerMessage } from "../../shared/src/protocol.ts";
 import { DEFAULT_REDUCER_CONFIG } from "../../shared/src/session.ts";
@@ -139,5 +142,40 @@ describe("config", () => {
     expect(c.reducer.idleMs).toBe(30_000);
     expect(c.allowedOrigins).toContain("http://localhost:5000");
     expect(c.allowedOrigins).toContain("http://127.0.0.1:4748");
+  });
+});
+
+describe("static files (production build)", () => {
+  const root = mkdtempSync(join(tmpdir(), "parkiran-static-"));
+  mkdirSync(join(root, "assets", "models"), { recursive: true });
+  writeFileSync(join(root, "index.html"), "<!doctype html><script type=module src=/assets/index-AbC_12-x.js></script>");
+  writeFileSync(join(root, "assets", "index-AbC_12-x.js"), "export {};");
+  writeFileSync(join(root, "assets", "models", "bench.glb"), "glb");
+  const web = createApp({ config: { ...config, staticDir: root }, store: new SessionStore(config.reducer), usage: new NoUsageSource(), log: () => undefined });
+  const at = (path: string, headers: Record<string, string> = {}) => fetch(`http://127.0.0.1:${web.server.port}${path}`, { headers });
+  afterAll(() => {
+    web.stop();
+    rmSync(root, { recursive: true, force: true });
+  });
+
+  test("hashed build chunks are cached for good, the page and models are revalidated", async () => {
+    expect((await at("/assets/index-AbC_12-x.js")).headers.get("cache-control")).toContain("immutable");
+    for (const path of ["/", "/assets/models/bench.glb"]) expect((await at(path)).headers.get("cache-control")).toBe("no-cache");
+  });
+
+  test("an unchanged file answers 304 to its ETag", async () => {
+    const first = await at("/assets/models/bench.glb");
+    const etag = first.headers.get("etag");
+    expect(etag).toBeTruthy();
+    const again = await at("/assets/models/bench.glb", { "if-none-match": etag! });
+    expect(again.status).toBe(304);
+  });
+
+  test("a chunk from an older build is a 404, not the app page; app routes still get the page", async () => {
+    const stale = await at("/assets/ez-tree.es-C7wZ5t5w.js");
+    expect(stale.status).toBe(404);
+    const route = await at("/some/route");
+    expect(route.status).toBe(200);
+    expect(await route.text()).toContain("<!doctype html>");
   });
 });
