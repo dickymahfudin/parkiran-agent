@@ -3,7 +3,8 @@ import { Canvas, useFrame, useThree } from "@react-three/fiber";
 import { Suspense, useEffect, useRef } from "react";
 import * as THREE from "three";
 import { Ambient } from "./art/Ambient.tsx";
-import { AssetBoundary } from "./art/assets.tsx";
+import { AssetBoundary, Ready } from "./art/assets.tsx";
+import { Festive } from "./art/Festive.tsx";
 import { Furniture } from "./art/Furniture.tsx";
 import { StaticMerge } from "./art/StaticMerge.tsx";
 import { Street } from "./art/Street.tsx";
@@ -152,12 +153,14 @@ export function Scene() {
       <DayNight />
       <Suspense fallback={null}>
         <Sky />
+        <Ready part="sky" />
       </Suspense>
       <AssetBoundary name="ground">
         <Suspense fallback={null}>
           <StaticMerge>
             <Ground />
           </StaticMerge>
+          <Ready part="ground" />
         </Suspense>
       </AssetBoundary>
       <AssetBoundary name="walls">
@@ -165,6 +168,7 @@ export function Scene() {
           <StaticMerge>
             <Walls />
           </StaticMerge>
+          <Ready part="walls" />
         </Suspense>
       </AssetBoundary>
       <AssetBoundary name="warung">
@@ -172,6 +176,7 @@ export function Scene() {
           <StaticMerge>
             <Warung />
           </StaticMerge>
+          <Ready part="warung" />
         </Suspense>
       </AssetBoundary>
       <AssetBoundary name="furniture">
@@ -179,6 +184,7 @@ export function Scene() {
           <StaticMerge>
             <Furniture />
           </StaticMerge>
+          <Ready part="furniture" />
         </Suspense>
       </AssetBoundary>
       <AssetBoundary name="vehicles">
@@ -186,16 +192,21 @@ export function Scene() {
           <StaticMerge>
             <Vehicles />
           </StaticMerge>
+          <Ready part="vehicles" />
         </Suspense>
       </AssetBoundary>
       <StaticMerge>
         <Street />
+      </StaticMerge>
+      <StaticMerge>
+        <Festive />
       </StaticMerge>
       <Trees />
       <Ambient />
       <AssetBoundary name="characters">
         <Suspense fallback={null}>
           <Characters />
+          <Ready part="characters" />
         </Suspense>
       </AssetBoundary>
       <Post compact={compact} />

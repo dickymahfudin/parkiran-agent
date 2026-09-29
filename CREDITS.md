@@ -29,6 +29,7 @@ All other clips (typing, smoking, sipping, lighter, gestures) are keyframed by `
 |---|---|---|---|
 | `@dgreenheck/ez-tree` 1.1.0 (procedural trees, bark and leaf textures included) | Daniel Greenheck | https://github.com/dgreenheck/ez-tree | MIT |
 | Plus Jakarta Sans (variable font, via `@fontsource-variable/plus-jakarta-sans`) | The Plus Jakarta Sans Project Authors (Tokotype) | https://github.com/tokotype/PlusJakartaSans | OFL-1.1 |
+| `lucide-react` 1.48.0 (HUD and name-tag icons) | Lucide Contributors | https://lucide.dev | ISC |
 
 ## Made for this project
 
@@ -65,6 +66,8 @@ All environment models, textures and skies come from Poly Haven (CC0). The table
 | Plastic Monobloc Chair 01 (`plastic_monobloc_chair_01`, model) | Kuutti Siitonen | https://polyhaven.com/a/plastic_monobloc_chair_01 | CC0 |
 | Trashbag (`trashbag`, model) | Benny Weimer | https://polyhaven.com/a/trashbag | CC0 |
 | Lightbulb 01 (`lightbulb_01`, model) | Josh Dean | https://polyhaven.com/a/lightbulb_01 | CC0 |
+| Spray Paint Bottles 02 (`spray_paint_bottles_02`, model) | Riley Queen | https://polyhaven.com/a/spray_paint_bottles_02 | CC0 |
+| Plastic Broom (`plastic_broom`, model) | L | https://polyhaven.com/a/plastic_broom | CC0 |
 | Asphalt 02 (`asphalt_02`, texture) | Rob Tuytel | https://polyhaven.com/a/asphalt_02 | CC0 |
 | Road Damaged (`road_damaged`, texture) | Dimitrios Savva | https://polyhaven.com/a/road_damaged | CC0 |
 | Concrete Pavement (`concrete_pavement`, texture) | Charlotte Baglioni | https://polyhaven.com/a/concrete_pavement | CC0 |

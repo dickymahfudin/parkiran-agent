@@ -7,6 +7,8 @@ import * as THREE from "three";
 import { clone as cloneSkinned } from "three/examples/jsm/utils/SkeletonUtils.js";
 import { CLIP_SEAT_Y } from "../layout.ts";
 import { sound } from "../../audio/sound.ts";
+import { Icon } from "../../hud/icons.tsx";
+import type { IconName } from "../../hud/labels.ts";
 import { getKtx2Loader } from "../art/assets.tsx";
 import { timeControl } from "../timeControl.ts";
 import type { Frame, NeedKind } from "./brain.ts";
@@ -28,6 +30,7 @@ export interface TagInfo {
   subtitle: string | null;
   color: string;
   text: string;
+  icon: IconName | null;
 }
 
 const GLB_URL = "/assets/character/character.glb";
@@ -295,7 +298,7 @@ interface Props {
 }
 
 const sameTag = (a: TagInfo | null, b: TagInfo | null): boolean =>
-  a === b || (a !== null && b !== null && a.title === b.title && a.subtitle === b.subtitle && a.color === b.color && a.text === b.text);
+  a === b || (a !== null && b !== null && a.title === b.title && a.subtitle === b.subtitle && a.color === b.color && a.text === b.text && a.icon === b.icon);
 
 /** Session updates re-render the character list many times a second; a person only re-renders when its tag changes. */
 export const Person = memo(
@@ -619,6 +622,7 @@ function PersonView({ brain, look, tag, friend, smoke, steam, onSelect, trackId 
               <span className="name-tag-title">{tag.title}</span>
               {tag.subtitle && <span className="name-tag-sub">{tag.subtitle}</span>}
               <span className="name-tag-state" style={{ color: tag.color }}>
+                {tag.icon && <Icon name={tag.icon} />}
                 {tag.text}
               </span>
             </div>

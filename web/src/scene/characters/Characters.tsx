@@ -57,7 +57,7 @@ function friendHome(sub: Subagent, parent: Home): { home: Home; key: string } {
 
 function tagFor(s: PublicSession, now: number): TagInfo {
   const label = stateLabel(s, now);
-  return { title: s.project ?? "?", subtitle: s.branch, color: MOOD_COLOR[label.mood], text: label.text };
+  return { title: s.project ?? "?", subtitle: s.branch, color: MOOD_COLOR[label.mood], text: label.text, icon: label.icon };
 }
 
 const DECLUTTER_EVERY = 3;
@@ -224,7 +224,7 @@ export function Characters() {
         const sub = e.agentId && s ? s.subagents[e.agentId] : undefined;
         const tag: TagInfo | null = s
           ? e.agentId
-            ? { title: sub?.type || "subagent", subtitle: null, color: "#c9d1d9", text: "helping" }
+            ? { title: sub?.type || "subagent", subtitle: null, color: "#c9d1d9", text: "helping", icon: null }
             : tagFor(s, now)
           : null;
         return (

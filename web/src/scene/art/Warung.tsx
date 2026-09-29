@@ -5,6 +5,7 @@ import { rng } from "../characters/identity.ts";
 import { envState } from "../env/envState.ts";
 import { AWNING_POLES, WARUNG } from "../layout.ts";
 import { canvasTexture, pbrMaterial, useModel, usePbr } from "./assets.tsx";
+import { Graffiti } from "./Graffiti.tsx";
 
 // Warung box: x 3.4…7.5, z −5.7…−1.7, open front facing −X with the counter just inside.
 const FRONT_X = WARUNG.minX;
@@ -357,6 +358,7 @@ export function Warung() {
         </mesh>
       ))}
       <Sachets />
+      <Graffiti plaster={plaster} />
       {/* Clutter */}
       <primitive object={crate1} position={[3.05, 0, -5.45]} rotation={[0, 0.2, 0]} />
       <primitive object={crate2} position={[3.05, 0.31, -5.45]} rotation={[0, -0.1, 0]} />

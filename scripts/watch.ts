@@ -4,7 +4,7 @@ import { readFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { DEFAULT_PORT, DEFAULT_WEB_PORT, parseEnvFile } from "../shared/src/env.ts";
 import type { PublicSession, ServerMessage } from "../shared/src/protocol.ts";
-import { cueText, stateLabel } from "../web/src/hud/labels.ts";
+import { cueLine, stateLabel } from "../web/src/hud/labels.ts";
 
 const REPO_ROOT = resolve(import.meta.dir, "..");
 const env = parseEnvFile(readFileSync(join(REPO_ROOT, ".env"), "utf8"));
@@ -34,7 +34,7 @@ ws.onmessage = (m) => {
   const msg = JSON.parse(String(m.data)) as ServerMessage;
   if (msg.type === "hello") msg.sessions.forEach(record);
   if (msg.type === "sessions") msg.updated.forEach(record);
-  if (msg.type === "cues") for (const c of msg.cues) cuesSeen.add(cueText(c));
+  if (msg.type === "cues") for (const c of msg.cues) cuesSeen.add(cueLine(c).text);
 };
 ws.onerror = () => {
   console.error(`cannot connect to ws://127.0.0.1:${port}/ws`);

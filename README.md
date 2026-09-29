@@ -67,19 +67,22 @@ unless you pass `--allow-reformat`. Both scripts accept `--dry-run` and `--setti
 | Session starts | walks in from the street along the gang, straight to a bench, stool or car hood, opens the laptop |
 | `thinking` | types with one hand, smokes with the other; when the tools start, the cigarette goes to the lips |
 | Working (`reading`, `bash`, `editing`, `browsing`, `subagent`) | types; slower for reading, faster for Bash |
-| Needs permission (`butuh korek 🔥`) | stands up with an unlit cigarette, pats pockets, looks around; lighter bubble |
+| Needs permission (`permission`) | stands up with an unlit cigarette, pats pockets, looks around; lighter bubble |
 | Permission approved | gets a light, first drag, sits back down |
 | Permission denied (inferred, Claude sends no event) | sighs, pockets the cigarette, sits back down |
-| Question / input (`question ❓`, `needs input ✋`) | stands up with a "?" bubble |
+| Question / input (`question`, `needs input`) | stands up with a "?" bubble |
 | `idle` | shuts the laptop, lights a cigarette and scrolls the phone, with the odd drag |
-| Tool or turn failure (`error 😤`) | facepalm, then back to work |
-| `compacting ☕` | buys a kopi at the warung window, drinks it on a free warung stool (or back on its own seat), walks back when done |
+| Tool or turn failure (`error`) | facepalm, then back to work |
+| `compacting` | buys a kopi at the warung window, drinks it on a free warung stool (or back on its own seat), walks back when done |
 | Subagent | a friend walks in and sits next to the parent, leaves when done |
-| Idle for 30 min (`ketiduran`) | laptop shut, dozes off, Zzz |
-| Session ends (`pulang`) | stubs out the cigarette, closes the laptop, walks away |
+| Idle for 30 min (`dozing`) | laptop shut, dozes off, Zzz |
+| Session ends (`leaving`) | stubs out the cigarette, closes the laptop, walks away |
 
 The scene follows your local clock: the sun and moon are computed from latitude/longitude, lamps and the warung light
 up at dusk, moths circle the street lamp at night. Cars and ojek riders pass by, and a kucing oren naps around the lot.
+The warung's side wall carries a spray-painted "NGOPI dulu!" piece with a kopi cup and its kretek, a korek gas and the
+writer's "dism" tag (drawn in code, weathered into the plaster, with the cans left at its foot) under a tin-shade lamp that lights it at night; warm festoon bulbs hang from the awning
+over the benches and red-white bunting runs along the back wall.
 
 **Camera:** drag to orbit, scroll to zoom towards whatever is under the mouse, right up to a person's face (scrolling
 back out returns to the overview), click a character to follow it. **Reset view** in the toolbar, the `R` key or a double-click on empty ground brings back the
@@ -95,18 +98,17 @@ appear. About 570 draw calls and 650k triangles a frame with six people in the l
 pass the camera), laptop keyboards while sessions work (louder when you zoom in), birds in the morning, crickets at
 night, the lighter, and the chime.
 
-**HUD:** session list (click a row or a character for details; the camera follows it), connection status, a
-parking meter (see below), and a toolbar: free / cinematic camera, reset view, compact mode for a second monitor,
-sound, notifications, and in dev mode a clock override.
+**HUD:** the session list shows each character's shirt colour next to the project, a summary of how many sessions
+need you, work or idle, and the tool and age of every session (click a row or a character for details; the camera
+follows it, `Esc` lets go). Sessions waiting on you also appear as a banner at the top until they are handled; the event
+feed has an "All / Needs you" filter. The toolbar has free / cinematic camera, reset view, compact mode for a second
+monitor, sound, notifications and the scene clock (a clock override in dev mode). A loading screen covers the lot until
+every part of the scene has arrived. States and events use stroke icons (Lucide), no emoji. Plain facts read in English; the warung jokes stay ("cari korek", "batal
+ngerokok", "bawa kopi").
 
 **Notifications:** when a session needs you, a chime plays (and repeats every 25 s); if the page is not focused you
-also get a system notification such as "warung-app butuh korek 🔥" with the branch. Clicking the character silences
+also get a system notification such as "warung-app needs permission" with the branch. Clicking the character silences
 it; it never changes the real session. Sound starts after your first click on the page (browser rule).
-
-**Parking meter:** the only documented plan-usage source is the status line input, which Claude Desktop never calls,
-and reading tokens or the Keychain is off limits. Without plan usage the meter charges parking like a kampung
-attendant: Rp 2.000 for a session's first hour and Rp 1.000 for every hour after, shown with the number of sessions and
-the total time parked. Plan usage would show instead if a source ever appears (`server/src/usage.ts`).
 
 URL options: `?time=21:00` (fixed scene time), `?compact`, `?cinematic`, `?stats` (frame-rate meter).
 
@@ -167,7 +169,7 @@ assets/   asset archive (+ raw downloads and Blender output, gitignored)
   `PARKIRAN_RELAY_DEBUG=1` in `.env` writes relay errors to `logs/`.
 - **"asset failed to load" in the HUD:** run `bun install` again (re-extracts the archive).
 - **Hooks stopped after a Bun upgrade:** `bun run install-hooks` again (the hook pins the bun binary path).
-- **No notifications:** allow notifications for 127.0.0.1 in the browser, then toggle 🔔 in the toolbar.
+- **No notifications:** allow notifications for 127.0.0.1 in the browser, then turn on the bell in the toolbar.
 
 ## License
 

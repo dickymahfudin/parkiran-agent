@@ -27,6 +27,8 @@ export const POLYHAVEN_MODELS: ModelEntry[] = [
   { id: "plastic_monobloc_chair_01", textureSize: 512 },
   { id: "trashbag", textureSize: 256 },
   { id: "lightbulb_01", textureSize: 256 },
+  { id: "spray_paint_bottles_02", textureSize: 512 },
+  { id: "plastic_broom", textureSize: 256 },
 ];
 
 /** PBR texture sets for procedural geometry (diffuse + GL normal + ARM). */

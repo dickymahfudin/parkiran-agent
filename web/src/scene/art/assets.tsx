@@ -1,9 +1,9 @@
 import { useGLTF } from "@react-three/drei";
 import { useLoader, useThree } from "@react-three/fiber";
-import { Component, useMemo, type ReactNode } from "react";
+import { Component, useEffect, useMemo, type ReactNode } from "react";
 import * as THREE from "three";
 import { KTX2Loader } from "three/examples/jsm/loaders/KTX2Loader.js";
-import { useApp } from "../../state/store.ts";
+import { useApp, type ScenePart } from "../../state/store.ts";
 
 const BASIS_PATH = "/basis/";
 let ktx2Loader: KTX2Loader | null = null;
@@ -91,17 +91,24 @@ export function pbrMaterial(set: PbrSet, extra: THREE.MeshStandardMaterialParame
 }
 
 /** Surfaces asset failures in the HUD instead of silently dropping part of the scene. */
-export class AssetBoundary extends Component<{ name: string; children: ReactNode }, { failed: boolean }> {
+export class AssetBoundary extends Component<{ name: ScenePart; children: ReactNode }, { failed: boolean }> {
   override state = { failed: false };
   static getDerivedStateFromError(): { failed: boolean } {
     return { failed: true };
   }
   override componentDidCatch(error: unknown): void {
     useApp.getState().reportAssetError(`${this.props.name}: ${error instanceof Error ? error.message : String(error)}`);
+    useApp.getState().markReady(this.props.name);
   }
   override render(): ReactNode {
     return this.state.failed ? null : this.props.children;
   }
+}
+
+/** Rendered inside a part's Suspense boundary: mounting means the part's assets have arrived. */
+export function Ready({ part }: { part: ScenePart }) {
+  useEffect(() => useApp.getState().markReady(part), [part]);
+  return null;
 }
 
 /** Seeded canvas texture helper for procedural decals, posters and prints. */

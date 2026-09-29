@@ -14,6 +14,10 @@ const MAX_CUE_LOG = 40;
 
 export type CameraMode = "orbit" | "cinematic";
 
+/** Scene parts that load assets; the loading screen lifts once each has mounted (or failed). */
+export const SCENE_PARTS = ["sky", "ground", "walls", "warung", "furniture", "vehicles", "characters"] as const;
+export type ScenePart = (typeof SCENE_PARTS)[number];
+
 const params = new URLSearchParams(location.search);
 
 /** Per-viewer preferences; storage can be unavailable (private mode), so failures fall back to defaults. */
@@ -48,6 +52,7 @@ interface AppState {
   /** Dev override of the scene clock, "HH:MM" (from ?time= or the HUD). */
   timeOverride: string | null;
   assetErrors: string[];
+  readyParts: ScenePart[];
   cameraMode: CameraMode;
   /** Bumped by "Reset view" (button, R key, double-click on empty ground); the camera rig eases back to the default angle. */
   viewResets: number;
@@ -62,6 +67,7 @@ interface AppState {
   setConnection(status: ConnectionStatus, error?: string | null): void;
   setTimeOverride(value: string | null): void;
   reportAssetError(message: string): void;
+  markReady(part: ScenePart): void;
   apply(msg: ServerMessage): void;
   select(id: string | null): void;
   setCameraMode(mode: CameraMode): void;
@@ -85,6 +91,7 @@ export const useApp = create<AppState>((set) => ({
   selectedId: null,
   timeOverride: params.get("time"),
   assetErrors: [],
+  readyParts: [],
   cameraMode: params.has("cinematic") ? "cinematic" : "orbit",
   viewResets: 0,
   compact: params.has("compact"),
@@ -95,6 +102,7 @@ export const useApp = create<AppState>((set) => ({
 
   setTimeOverride: (timeOverride) => set({ timeOverride }),
   reportAssetError: (message) => set((st) => (st.assetErrors.includes(message) ? st : { assetErrors: [...st.assetErrors, message] })),
+  markReady: (part) => set((st) => (st.readyParts.includes(part) ? st : { readyParts: [...st.readyParts, part] })),
 
   setConnection: (connection, error = null) => set({ connection, connectionError: error }),
 

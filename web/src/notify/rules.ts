@@ -7,9 +7,9 @@ export const NOTIFY_EVERY_MS = 60_000;
 export const CHIME_EVERY_MS = 25_000;
 
 const TITLE: Record<NonNullable<PublicSession["need"]>["kind"], string> = {
-  permission: "butuh korek 🔥",
-  question: "nanya ❓",
-  input: "butuh input ✋",
+  permission: "needs permission",
+  question: "has a question",
+  input: "needs input",
 };
 
 export function notificationTitle(s: PublicSession): string {
