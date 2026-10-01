@@ -3,10 +3,9 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import * as THREE from "three";
 import type { PublicSession } from "../../../../shared/src/protocol.ts";
 import { SEATS } from "../../../../shared/src/seats.ts";
-import type { Subagent } from "../../../../shared/src/session.ts";
 import { MOOD_COLOR, stateLabel } from "../../hud/labels.ts";
 import { serverNow, useApp } from "../../state/store.ts";
-import { SEAT_PLACES, WARUNG_STOOLS, assignStandingSpots, assignWarungStools, standingSpotFor, type StandingSpot } from "../layout.ts";
+import { SEAT_PLACES, WARUNG_STOOLS, assignStandingSpots, assignWarungStools, nearestStandingSpot, standingSpotFor, type StandingSpot } from "../layout.ts";
 import { Brain, type Home, type Target } from "./brain.ts";
 import { hash32, lookFor, type Look } from "./identity.ts";
 import { Person, type TagInfo } from "./Person.tsx";
@@ -48,12 +47,30 @@ function homeFromSeat(seatId: string | null, standing: StandingSpot): { home: Ho
   return { home: { point: spot.point, yaw: spot.yaw, node: spot.node, seat: null }, key: `stand-${spot.point.join(",")}` };
 }
 
-function friendHome(sub: Subagent, parent: Home): { home: Home; key: string } {
-  if (sub.seat) return homeFromSeat(sub.seat, standingSpotFor(hash32(sub.id)));
-  const side = (hash32(sub.id) & 1) === 0 ? 1 : -1;
-  const point = [parent.point[0] + Math.cos(parent.yaw) * 0.8 * side, parent.point[1] - Math.sin(parent.yaw) * 0.8 * side] as const;
-  return { home: { point, yaw: parent.yaw, node: parent.node, seat: null }, key: `beside-${point.join(",")}` };
+const hasSeat = (seat: string | null): seat is string => seat !== null && SEAT_PLACES[seat] !== undefined;
+
+/**
+ * Everyone without a seat (sessions and subagent friends) gets a standing spot, in arrival order so nobody moves when
+ * someone new comes; a friend prefers the spot nearest its parent.
+ */
+function standingPlaces(sessions: readonly PublicSession[]): Map<string, StandingSpot> {
+  const standers: { key: string; at: number; prefer: number }[] = [];
+  for (const s of sessions) {
+    const parentAt = hasSeat(s.seat) ? SEAT_PLACES[s.seat]!.approach : standingSpotFor(hash32(s.id)).point;
+    if (!hasSeat(s.seat)) standers.push({ key: s.id, at: s.startedAt, prefer: hash32(s.id) });
+    for (const sub of Object.values(s.subagents)) {
+      if (!hasSeat(sub.seat)) standers.push({ key: friendKey(s.id, sub.id), at: sub.startedAt, prefer: nearestStandingSpot(parentAt) });
+    }
+  }
+  standers.sort((a, b) => a.at - b.at || a.key.localeCompare(b.key));
+  const prefer = new Map(standers.map((x) => [x.key, x.prefer]));
+  return assignStandingSpots(
+    standers.map((x) => x.key),
+    (key) => prefer.get(key)!,
+  );
 }
+
+const friendKey = (sessionId: string, agentId: string): string => `${sessionId}/${agentId}`;
 
 function tagFor(s: PublicSession, now: number): TagInfo {
   const label = stateLabel(s, now);
@@ -172,16 +189,14 @@ export function Characters() {
       return e;
     };
 
-    const seatless = Object.values(st.sessions)
-      .filter((s) => !s.seat || !SEAT_PLACES[s.seat])
-      .sort((a, b) => a.startedAt - b.startedAt || a.id.localeCompare(b.id));
-    const standing = assignStandingSpots(seatless.map((s) => s.id), hash32);
+    const standing = standingPlaces(Object.values(st.sessions));
     for (const s of Object.values(st.sessions)) {
       const home = homeFromSeat(s.seat, standing.get(s.id) ?? standingSpotFor(hash32(s.id)));
       ensure(s.id, s.id, null, home, targetFor(s)).brain.setTarget(targetFor(s), s.lastOutcome, now);
       for (const sub of Object.values(s.subagents)) {
+        const key = friendKey(s.id, sub.id);
         const target: Target = s.phase === "leaving" ? { kind: "gone" } : { kind: "seated", activity: "work", work: sub.work };
-        ensure(`${s.id}/${sub.id}`, s.id, sub.id, friendHome(sub, home.home), target).brain.setTarget(target, null, now);
+        ensure(key, s.id, sub.id, homeFromSeat(sub.seat, standing.get(key) ?? standingSpotFor(hash32(sub.id))), target).brain.setTarget(target, null, now);
       }
     }
 

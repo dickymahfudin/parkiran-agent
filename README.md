@@ -74,9 +74,12 @@ unless you pass `--allow-reformat`. Both scripts accept `--dry-run` and `--setti
 | `idle` | shuts the laptop, lights a cigarette and scrolls the phone, with the odd drag |
 | Tool or turn failure (`error`) | facepalm, then back to work |
 | `compacting` | buys a kopi at the warung window, drinks it on a free warung stool (or back on its own seat), walks back when done |
-| Subagent | a friend walks in and sits next to the parent, leaves when done |
+| Subagent | a friend walks in and sits next to the parent (or on any free seat), leaves when done |
 | Idle for 30 min (`dozing`) | laptop shut, dozes off, Zzz |
 | Session ends (`leaving`) | stubs out the cigarette, closes the laptop, walks away |
+
+When every seat is taken, newcomers and friends stand at their own spot (clear of the sitters, the cars and the
+walking lanes, never inside each other) and sit down as soon as a seat frees up.
 
 The scene follows your local clock: the sun and moon are computed from latitude/longitude, lamps and the warung light
 up at dusk, moths circle the street lamp at night. Cars and ojek riders pass by, and a kucing oren naps around the lot.
@@ -90,7 +93,7 @@ default angle.
 
 **Street:** cars and ojek share each lane single file and keep a safe gap to whoever is ahead.
 
-**Performance:** the scene renders at most 60 fps (evenly paced on 120 Hz screens), drops resolution in three steps
+**Performance:** the scene renders at most 60 fps (evenly paced on 120 Hz screens) and 30 fps while another window has the focus (watching on a second screen), drops resolution in three steps
 (1.5 → 1.25 → 1) when frames run slow, and compiles every shader up front so props never stall a frame when they first
 appear. About 570 draw calls and 650k triangles a frame with six people in the lot.
 

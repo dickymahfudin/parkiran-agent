@@ -1,8 +1,8 @@
 {
-  "archiveSha256": "25db40139526bfe9adf9985f87e4cc97715105ad2d72fe9f5a52630e59153db5",
-  "archiveBytes": 30291159,
+  "archiveSha256": "8db002c0f5e35d94bd42070140f66b9a7d5ef498f6470d108f1ee462f77d3ed2",
+  "archiveBytes": 30283016,
   "files": {
-    "assets/character/character.glb": "65169402d25a42b81d26511a1d385a06a698056f84068dff0895153eaa083934",
+    "assets/character/character.glb": "f337b3937e168af4eaf8b3dbbd17a9f0fdc3c52bd60b1158c03ea40d2559ead1",
     "assets/character/clips.json": "ae2d01f88cb4b128d9897db98d73faba4c6d1734e9c251a3e0983c2aabce55c6",
     "assets/hdri/belfast_sunset_puresky_1k.hdr": "cec532d8dd382bcdca98d7010fa951a782f3295f98e8bd72ee453be8d0a64e98",
     "assets/hdri/kiara_1_dawn_1k.hdr": "ee70fb8c8fb3e34566802191d83b299e179ecc392b97639e6c750f66e161c8e2",

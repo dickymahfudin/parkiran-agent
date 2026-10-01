@@ -1,9 +1,10 @@
 // Life around the lot that does not depend on sessions: passing cars, a sleeping cat, falling leaves.
 import { useFrame, useThree } from "@react-three/fiber";
-import { Suspense, useMemo, useRef } from "react";
+import { Suspense, useEffect, useMemo, useRef } from "react";
 import * as THREE from "three";
 import { sound, type VehicleKind } from "../../audio/sound.ts";
 import { lookFor, rng } from "../characters/identity.ts";
+import { disposeSkinned } from "../characters/dispose.ts";
 import { attach, buildRig, useCharacterAsset } from "../characters/Person.tsx";
 import { envState } from "../env/envState.ts";
 import { timeControl } from "../timeControl.ts";
@@ -135,6 +136,7 @@ export function Rider({ id, helmet }: { id: string; helmet: string }) {
     return r;
   }, [asset, look, helmet]);
   const mixer = useMemo(() => new THREE.AnimationMixer(rig.object), [rig]);
+  useEffect(() => () => disposeSkinned(rig.object), [rig]);
   const offset = useMemo(() => {
     const ride = asset.clips.get("ride");
     if (!ride) throw new Error("ride clip missing");

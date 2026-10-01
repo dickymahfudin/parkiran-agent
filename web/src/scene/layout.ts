@@ -72,6 +72,14 @@ export const CARS = [
 ] as const;
 
 export const COVERED_CAR = { x: 3.7, z: 2.6, yaw: 0.12 } as const;
+/** Bumper to bumper, halved, per car model (Vehicles.tsx). */
+const CAR_HALF_LENGTH = { sedan: 2.225, hatch: 1.9 } as const;
+/** Side by side, nose out, staggered so handlebars and mirrors never meet. */
+export const PARKED_SCOOTERS = [
+  { x: 1.3, z: 2.2, yaw: 0.06 },
+  { x: 2.15, z: 1.95, yaw: -0.04 },
+] as const;
+export const GEROBAK = { x: 0.75, z: -5.05 } as const;
 
 export const WARUNG = { minX: 3.4, maxX: 7.5, minZ: -5.7, maxZ: -1.7, awningX: 1.55 } as const;
 /** Bamboo poles holding the awning's outer edge (x, z). */
@@ -167,14 +175,69 @@ export const SEAT_PLACES: Record<string, SeatPlace> = Object.fromEntries(
   ].map((s) => [s.id, s]),
 );
 
-/** Where seatless characters stand (lot full). */
+const dist = (a: Vec2, b: Vec2): number => Math.hypot(a[0] - b[0], a[1] - b[1]);
+
+/** Small props on the ground a standing person keeps clear of (x, z). */
+const PROPS_ON_GROUND: readonly Vec2[] = [
+  [-2.25, -5.3], [-5.9, -1.6], [LOT.minX + 0.35, -5.5], [-5.95, -5.25], [2.15, -5.35], [7.05, -0.6], [6.95, 4.6], [6.85, 3.9], [5.2, -1.25], [3.35, -1.95],
+];
+/** Half the width of a standing person with the laptop under the arm (m). */
+const BODY_R = 0.3;
+
+const insideBox = (p: Vec2, x0: number, x1: number, z0: number, z1: number, margin: number): boolean =>
+  p[0] > x0 - margin && p[0] < x1 + margin && p[1] > z0 - margin && p[1] < z1 + margin;
+
+/** Whether `p` is inside something solid (a parked vehicle, the warung, a bench, the gerobak, a pole or a prop). */
+export function solidAt(p: Vec2, margin = BODY_R): boolean {
+  for (const c of CARS) if (insideBox(p, c.x - 1, c.x + 1, c.z - CAR_HALF_LENGTH[c.model], c.z + CAR_HALF_LENGTH[c.model], margin + 0.1)) return true;
+  if (insideBox(p, COVERED_CAR.x - 1.05, COVERED_CAR.x + 1.05, COVERED_CAR.z - 2.45, COVERED_CAR.z + 2.45, margin + 0.1)) return true;
+  for (const m of PARKED_SCOOTERS) if (insideBox(p, m.x - 0.4, m.x + 0.4, m.z - 0.95, m.z + 0.95, margin)) return true;
+  if (insideBox(p, WARUNG.minX, WARUNG.maxX, WARUNG.minZ, WARUNG.maxZ, margin)) return true;
+  for (const b of BENCHES) if (insideBox(p, b.x - 0.95, b.x + 0.95, b.z - 0.35, b.z + 0.35, margin)) return true;
+  if (insideBox(p, GEROBAK.x - 1, GEROBAK.x + 1, GEROBAK.z - 0.55, GEROBAK.z + 0.55, margin)) return true;
+  if (AWNING_POLES.some((pole) => dist(p, pole) < margin + 0.15)) return true;
+  return PROPS_ON_GROUND.some((q) => dist(p, q) < margin + 0.3);
+}
+
+/**
+ * Whether someone can stand at `p`: inside the lot, nothing solid there, not inside a seated person (hips, knees,
+ * feet) and not blocking the stools under the awning.
+ */
+export function clearToStand(p: Vec2): boolean {
+  if (!insideBox(p, LOT.minX + 0.4, LOT.maxX - 0.45, LOT.minZ + 0.45, LOT.maxZ - 0.5, 0)) return false;
+  if (solidAt(p) || insideBox(p, WARUNG.awningX - 0.6, WARUNG.minX, WARUNG.minZ, WARUNG.maxZ, 0.1)) return false;
+  return Object.values(SEAT_PLACES).every((seat) => {
+    const hip: Vec2 = [seat.hip[0], seat.hip[2]];
+    const feet: Vec2 = [seat.hip[0] + Math.sin(seat.yaw) * 0.55, seat.hip[2] + Math.cos(seat.yaw) * 0.55];
+    return dist(p, hip) >= 0.85 && dist(p, feet) >= 0.7 && dist(p, seat.approach) >= 0.6;
+  });
+}
+
+/** Standing people watch the middle of the lot. */
+const WATCH_POINT: Vec2 = [-1, 0.8];
+const watching = (point: Vec2, node: string) => ({ point, node, yaw: Math.atan2(WATCH_POINT[0] - point[0], WATCH_POINT[1] - point[1]) });
+
+/**
+ * Where people stand when no seat is free (sessions and subagent friends): each clear to stand (`clearToStand`), off
+ * the walking lanes, 1.5 m or more apart, reached in a straight line from its graph node without walking through
+ * anything solid (all checked in layout.test.ts).
+ */
 export const STANDING_SPOTS: { point: Vec2; yaw: number; node: string }[] = [
-  { point: [-5.2, 3.4], yaw: 0.6, node: "gate" },
-  { point: [1.3, 3.6], yaw: -0.5, node: "frontE" },
-  { point: [-5.6, -3.9], yaw: 0.4, node: "backW" },
-  { point: [0.6, -4.1], yaw: -0.3, node: "backE" },
-  { point: [-4.6, -1.4], yaw: 1.2, node: "westAisle" },
-  { point: [0.4, -1.3], yaw: -1.0, node: "backE" },
+  watching([-5.4, 3.8], "gate"),
+  watching([-3.0, 4.0], "frontW"),
+  watching([0.2, 4.0], "frontM"),
+  watching([1.8, 4.2], "frontE"),
+  watching([-5.9, -3.0], "backW"),
+  watching([-5.7, -4.5], "backW"),
+  watching([-0.1, -1.4], "backE"),
+  watching([0.4, -3.4], "stoolIn2"),
+  watching([-2.8, -2.0], "backM"),
+  watching([-1.6, -0.8], "backM"),
+  watching([1.2, 0.0], "stoolIn4"),
+  // By the warung's corner and in front of the graffiti.
+  watching([3.0, -1.4], "warung"),
+  watching([4.4, -0.6], "warung"),
+  watching([6.4, 0.2], "warung"),
 ];
 
 const ADJ = new Map<string, string[]>();
@@ -182,8 +245,6 @@ for (const [a, b] of EDGES) {
   ADJ.set(a, [...(ADJ.get(a) ?? []), b]);
   ADJ.set(b, [...(ADJ.get(b) ?? []), a]);
 }
-
-const dist = (a: Vec2, b: Vec2): number => Math.hypot(a[0] - b[0], a[1] - b[1]);
 
 function nearestNode(p: Vec2): string {
   let best = "gate";
@@ -272,38 +333,64 @@ export function standingSpotFor(hash: number): StandingSpot {
   return STANDING_SPOTS[hash % STANDING_SPOTS.length]!;
 }
 
+/** The standing spot nearest to `p`, as an index into STANDING_SPOTS. */
+export function nearestStandingSpot(p: Vec2): number {
+  let best = 0;
+  for (let i = 1; i < STANDING_SPOTS.length; i++) if (dist(p, STANDING_SPOTS[i]!.point) < dist(p, STANDING_SPOTS[best]!.point)) best = i;
+  return best;
+}
+
 /** Side step between people sharing a standing spot once every spot is taken (m). */
 const CROWD_STEP = 0.75;
+/** Closest two standing people get. */
+const CROWD_GAP = 0.65;
 
 /**
- * Standing places for seatless people, `ids` in arrival order: each takes its preferred spot (by hash) or the next free
- * one, so nobody stands inside someone else; once all spots are taken, newcomers line up beside the preferred spot.
- * Earlier arrivals never move when someone new comes.
+ * Standing places for seatless people, `ids` in arrival order: each takes its preferred spot (`prefer` gives an index)
+ * or the next free one, so nobody stands inside someone else; once all spots are taken, newcomers line up beside the
+ * preferred spot, on the first places that are clear to stand and clear of everyone already standing. Earlier arrivals
+ * never move when someone new comes.
  */
-export function assignStandingSpots(ids: readonly string[], hash: (id: string) => number): Map<string, StandingSpot> {
+export function assignStandingSpots(ids: readonly string[], prefer: (id: string) => number): Map<string, StandingSpot> {
   const out = new Map<string, StandingSpot>();
-  const taken = new Map<number, number>();
+  const free = new Set(STANDING_SPOTS.keys());
+  const placed: Vec2[] = [];
   for (const id of ids) {
-    const preferred = hash(id) % STANDING_SPOTS.length;
-    let index = preferred;
-    for (let k = 0; k < STANDING_SPOTS.length; k++) {
+    const preferred = ((prefer(id) % STANDING_SPOTS.length) + STANDING_SPOTS.length) % STANDING_SPOTS.length;
+    let index = -1;
+    for (let k = 0; k < STANDING_SPOTS.length && index < 0; k++) {
       const i = (preferred + k) % STANDING_SPOTS.length;
-      if (!taken.has(i)) {
-        index = i;
-        break;
-      }
+      if (free.has(i)) index = i;
     }
-    const crowd = taken.get(index) ?? 0;
-    taken.set(index, crowd + 1);
-    const spot = STANDING_SPOTS[index]!;
-    if (crowd === 0) {
+    if (index >= 0) {
+      free.delete(index);
+      const spot = STANDING_SPOTS[index]!;
       out.set(id, spot);
+      placed.push(spot.point);
       continue;
     }
-    // Alternate left and right of the spot, along the line the person faces across.
-    const side = (crowd % 2 === 1 ? 1 : -1) * Math.ceil(crowd / 2) * CROWD_STEP;
-    const point: Vec2 = [spot.point[0] + Math.cos(spot.yaw) * side, spot.point[1] - Math.sin(spot.yaw) * side];
+    // Every spot taken: line up beside the preferred one (alternating sides along the line its people face across,
+    // then a row behind and in front), else beside the next spots; the first place clear of furniture and people wins.
+    let spot = STANDING_SPOTS[preferred]!;
+    let point: Vec2 = spot.point;
+    search: for (let k = 0; k < STANDING_SPOTS.length; k++) {
+      const s = STANDING_SPOTS[(preferred + k) % STANDING_SPOTS.length]!;
+      const across: Vec2 = [Math.cos(s.yaw), -Math.sin(s.yaw)];
+      const back: Vec2 = [-Math.sin(s.yaw), -Math.cos(s.yaw)];
+      for (const row of [0, 1, -1]) {
+        for (let n = row === 0 ? 1 : 0; n <= 4; n++) {
+          const side = (n % 2 === 1 ? 1 : -1) * Math.ceil(n / 2) * CROWD_STEP;
+          const p: Vec2 = [s.point[0] + across[0] * side + back[0] * row * CROWD_STEP, s.point[1] + across[1] * side + back[1] * row * CROWD_STEP];
+          if (clearToStand(p) && placed.every((q) => dist(p, q) >= CROWD_GAP)) {
+            spot = s;
+            point = p;
+            break search;
+          }
+        }
+      }
+    }
     out.set(id, { ...spot, point });
+    placed.push(point);
   }
   return out;
 }

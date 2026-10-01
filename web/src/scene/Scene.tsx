@@ -30,6 +30,12 @@ const COMPACT_DPR = 1;
 const DPR_STEPS = [1, 1.25, 1.5] as const;
 /** At most 60 frames a second, a few ms of vsync jitter allowed: every vsync at 60 Hz, every other one at 120 Hz. */
 const MIN_FRAME_S = 1 / 60 - 0.004;
+/** While another window has the focus (the lot watched on a second screen), 30 is plenty and halves the work. */
+const BACKGROUND_MIN_FRAME_S = 1 / 30 - 0.004;
+/** The resolution monitor judges 2.5 s of frames; it sits out this long after the frame cap changes. */
+const PACE_SETTLE_MS = 3000;
+const NEUTRAL_BOUNDS: [number, number] = [0, Infinity];
+const pace = { background: false, settledAt: 0 };
 /** How often to look for meshes whose shaders have not been compiled yet. */
 const WARMUP_CHECK_MS = 2000;
 
@@ -66,8 +72,13 @@ function FrameLimiter() {
     let last = -Infinity;
     const tick = (ms: number) => {
       raf = requestAnimationFrame(tick);
+      const background = !document.hasFocus();
+      if (background !== pace.background) {
+        pace.background = background;
+        pace.settledAt = performance.now() + PACE_SETTLE_MS;
+      }
       const t = ms / 1000;
-      if (t - last < MIN_FRAME_S) return;
+      if (t - last < (background ? BACKGROUND_MIN_FRAME_S : MIN_FRAME_S)) return;
       last = t;
       advance(t);
     };
@@ -90,7 +101,8 @@ function AdaptiveResolution() {
     <PerformanceMonitor
       factor={1}
       flipflops={4}
-      bounds={() => [45, 58]}
+      // A capped frame rate is not a slow GPU: no verdict while capped or just after.
+      bounds={() => (pace.background || performance.now() < pace.settledAt ? NEUTRAL_BOUNDS : [45, 58])}
       onChange={({ factor }) => to(Math.round(factor * (DPR_STEPS.length - 1)))}
       onFallback={() => to(0)}
     />
@@ -106,8 +118,12 @@ function ShaderWarmup() {
   const scene = useThree((s) => s.scene);
   const camera = useThree((s) => s.camera);
   useEffect(() => {
+    // Programs depend on the target: the scene is drawn into the composer's linear buffers, never straight to the
+    // canvas, so compiling against the canvas would build variants that are never used.
+    const target = new THREE.WebGLRenderTarget(1, 1);
     let meshes = 0;
     const check = () => {
+      if (document.hidden) return;
       let n = 0;
       scene.traverse((o) => void ((o as THREE.Mesh).isMesh && n++));
       if (n === meshes) return;
@@ -119,11 +135,17 @@ function ShaderWarmup() {
         o.visible = true;
       });
       // compile() runs synchronously inside compileAsync; only the linking finishes in the background.
+      const previous = gl.getRenderTarget();
+      gl.setRenderTarget(target);
       void gl.compileAsync(scene, camera).catch((e: unknown) => console.error("shader warm-up failed", e));
+      gl.setRenderTarget(previous);
       for (const o of hidden) o.visible = false;
     };
     const id = window.setInterval(check, WARMUP_CHECK_MS);
-    return () => window.clearInterval(id);
+    return () => {
+      window.clearInterval(id);
+      target.dispose();
+    };
   }, [gl, scene, camera]);
   return null;
 }

@@ -9,7 +9,8 @@ import { MOOD_COLOR, MOOD_NAME, NEED_ICON, cueLine, type StateLabel, formatAge, 
 function useNow(intervalMs: number): number {
   const [now, setNow] = useState(serverNow);
   useEffect(() => {
-    const id = setInterval(() => setNow(serverNow()), intervalMs);
+    // Nobody reads the clock of a hidden page; it catches up within a tick of coming back.
+    const id = setInterval(() => !document.hidden && setNow(serverNow()), intervalMs);
     return () => clearInterval(id);
   }, [intervalMs]);
   return now;

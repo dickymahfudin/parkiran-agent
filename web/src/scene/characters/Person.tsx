@@ -12,6 +12,7 @@ import type { IconName } from "../../hud/labels.ts";
 import { getKtx2Loader } from "../art/assets.tsx";
 import { timeControl } from "../timeControl.ts";
 import type { Frame, NeedKind } from "./brain.ts";
+import { disposeSkinned } from "./dispose.ts";
 import { SOLE_AHEAD, loweredAnkle, placeSandal, reachLeg, type SandalAnchor } from "./feet.ts";
 import { SANDAL_THICKNESS, Sandal } from "./Sandal.tsx";
 import type { Look } from "./identity.ts";
@@ -271,6 +272,9 @@ const PHONE_CASES = ["#d9d4c7", "#3f6fb0", "#c0463a", "#e7b9c0", "#8fa67a", "#1b
   (color) => new THREE.MeshStandardMaterial({ color, roughness: 0.5 }),
 );
 
+/** Phone centre from the wrist (m): along the fingers, out of the palm, and up the knuckle line towards the index. */
+const PHONE_GRIP = { along: 0.089, out: 0.024, up: 0.06 } as const;
+
 /** Phone prop (a big one, 7.6 × 16 cm): +Z out of the screen, +Y along the long side. */
 function Phone({ seed }: { seed: number }) {
   return (
@@ -346,15 +350,18 @@ function PersonView({ brain, look, tag, friend, smoke, steam, onSelect, trackId 
     attach(rig, "LeftHand", lighter, l.hand.clone().addScaledVector(l.fingers, 0.065).addScaledVector(l.palm, 0.022), l.palm, l.across);
     // Standing, the left hand carries the laptop, so the standing light-up clip uses the right hand.
     attach(rig, "RightHand", lighterR, r.hand.clone().addScaledVector(r.fingers, 0.065).addScaledVector(r.palm, 0.022), r.palm, r.across);
-    // Phone upright in the palm: back on the palm, screen facing out of it, long side along the knuckle line (top by
-    // the index finger), the fingers curled round its far edge. Seated it is in the left hand (the right one smokes);
-    // standing in the right (the left carries the laptop).
+    // Phone upright in the palm: back on the palm and the flat fingers, screen facing out of it, long side along the
+    // knuckle line, its bottom edge just above the pinky and the rest of it rising past the index finger. The `phone`
+    // finger pose in make_animations.py is fitted to exactly this box and place: index to ring round the far edge, the
+    // thumb on the screen, nothing inside the phone. Seated it is in the left hand (the right one smokes); standing in
+    // the right (the left carries the laptop).
     // The knuckle line slants back towards the pinky; square to the fingers instead, so the phone stands upright when
     // the clip holds the fingers level.
     for (const [f, bone, phone] of [[l, "LeftHand", phoneL], [r, "RightHand", phoneR]] as const) {
       const upright = new THREE.Vector3().crossVectors(f.palm, f.fingers).normalize();
       if (upright.dot(f.across) < 0) upright.negate();
-      attach(rig, bone, phone, f.hand.clone().addScaledVector(f.fingers, 0.06).addScaledVector(f.palm, 0.024), f.palm, upright);
+      const at = f.hand.clone().addScaledVector(f.fingers, PHONE_GRIP.along).addScaledVector(f.palm, PHONE_GRIP.out).addScaledVector(upright, PHONE_GRIP.up);
+      attach(rig, bone, phone, at, f.palm, upright);
     }
     attach(rig, "RightHand", cup, r.hand.clone().addScaledVector(r.fingers, 0.06).addScaledVector(r.palm, 0.05), r.across);
     attach(rig, "LeftHand", carry, l.hand.clone().addScaledVector(l.fingers, 0.13).addScaledVector(l.palm, 0.02), l.across, l.palm);
@@ -385,10 +392,12 @@ function PersonView({ brain, look, tag, friend, smoke, steam, onSelect, trackId 
   useEffect(
     () => () => {
       mixer.stopAllAction();
+      mixer.uncacheRoot(rig.object);
       actions.current.clear();
     },
-    [mixer],
+    [mixer, rig],
   );
+  useEffect(() => () => disposeSkinned(rig.object), [rig]);
   useEffect(() => {
     if (!trackId) return;
     characterRoots.set(trackId, root.current);

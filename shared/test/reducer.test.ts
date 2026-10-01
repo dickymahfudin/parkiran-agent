@@ -250,11 +250,35 @@ describe("subagents (friends)", () => {
     expect(kinds(cues)).toEqual(["arrived"]);
   });
 
-  test("friend takes no seat when the neighbour is taken", () => {
+  test("with the neighbour seat taken, a friend sits on any free seat instead of standing", () => {
     let world = EMPTY_WORLD;
     for (let i = 0; i < 3; i++) world = run([ev("SessionStart", i, { sessionId: `0000000${i}-0000-0000-0000-000000000000` })], world).world;
     world = run([ev("SubagentStart", 9, { sessionId: "00000000-0000-0000-0000-000000000000", agentId: "f", agentType: "Explore" })], world).world;
-    expect(world.sessions["00000000-0000-0000-0000-000000000000"]!.subagents.f!.seat).toBeNull();
+    expect(world.sessions["00000000-0000-0000-0000-000000000000"]!.seat).toBe("bench-1a");
+    expect(world.sessions["00000000-0000-0000-0000-000000000000"]!.subagents.f!.seat).toBe("bench-2b");
+  });
+
+  test("five friends of one session never share a seat; the ones that find none stand", () => {
+    let world = EMPTY_WORLD;
+    for (let i = 0; i < 6; i++) world = run([ev("SessionStart", i, { sessionId: `0000000${i}-0000-0000-0000-000000000000` })], world).world;
+    const parent = "00000000-0000-0000-0000-000000000000";
+    for (const a of ["f1", "f2", "f3", "f4", "f5"]) world = run([ev("SubagentStart", 10, { sessionId: parent, agentId: a, agentType: "general-purpose" })], world).world;
+    const seats = Object.values(world.sessions[parent]!.subagents).map((f) => f.seat);
+    expect(seats).toEqual(["stool-2", "stool-4", "hood-1", "hood-2", null]);
+    const all = [...Object.values(world.sessions).map((s) => s.seat), ...seats].filter((x) => x !== null);
+    expect(new Set(all).size).toBe(all.length);
+  });
+
+  test("a friend left standing sits down when a seat frees up", () => {
+    let world = EMPTY_WORLD;
+    const ids = Array.from({ length: 10 }, (_, i) => `${String(i).padStart(8, "0")}-0000-0000-0000-000000000000`);
+    for (const [i, id] of ids.entries()) world = run([ev("SessionStart", i, { sessionId: id })], world).world;
+    world = run([ev("SubagentStart", 20, { sessionId: ids[0]!, agentId: "f", agentType: "Explore" })], world).world;
+    expect(world.sessions[ids[0]!]!.subagents.f!.seat).toBeNull();
+    world = run([ev("SessionEnd", 21, { sessionId: ids[9]!, endReason: "other" })], world).world;
+    world = tick(world, 21 + cfg.leaveMs, cfg).world;
+    world = run([ev("PreToolUse", 30, { sessionId: ids[0]!, toolName: "Read", toolUseId: "r", agentId: "f", agentType: "Explore" })], world).world;
+    expect(world.sessions[ids[0]!]!.subagents.f!.seat).toBe("hood-2");
   });
 });
 
@@ -286,6 +310,21 @@ describe("seats", () => {
     expect(ids.map((id) => world.sessions[id]!.seat)).toEqual([
       "bench-1a", "bench-2a", "bench-1b", "bench-2b", "stool-1", "stool-3", "stool-2", "stool-4", "hood-1", "hood-2", null,
     ]);
+  });
+});
+
+describe("standing until a seat frees up", () => {
+  test("a session that arrived to a full lot sits down on its next event after someone leaves", () => {
+    let world = EMPTY_WORLD;
+    const ids = Array.from({ length: 11 }, (_, i) => `${String(i).padStart(8, "0")}-0000-0000-0000-000000000000`);
+    for (const [i, id] of ids.entries()) world = run([ev("SessionStart", i, { sessionId: id })], world).world;
+    expect(world.sessions[ids[10]!]!.seat).toBeNull();
+    world = run([ev("SessionEnd", 20, { sessionId: ids[2]!, endReason: "other" })], world).world;
+    world = run([ev("PreToolUse", 21, { sessionId: ids[10]!, toolName: "Read", toolUseId: "r" })], world).world;
+    expect(world.sessions[ids[10]!]!.seat).toBeNull();
+    world = tick(world, 20 + cfg.leaveMs, cfg).world;
+    world = run([ev("PostToolUse", 22 + cfg.leaveMs, { sessionId: ids[10]!, toolName: "Read", toolUseId: "r" })], world).world;
+    expect(world.sessions[ids[10]!]!.seat).toBe("bench-1b");
   });
 });
 

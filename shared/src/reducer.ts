@@ -123,6 +123,11 @@ export function reduce(world: World, ev: IngestEvent, config: ReducerConfig = DE
 
   const subagent = ev.agentId !== undefined ? s.subagents[ev.agentId] : undefined;
   if (subagent) subagent.lastEventAt = Math.max(subagent.lastEventAt, ev.ts);
+  // Whoever had to stand takes a seat as soon as one frees up (on their next event).
+  if (live && ev.event !== "SessionEnd" && s.phase !== "leaving") {
+    if (s.seat === null) s.seat = pickSeat(occupiedSeats(next));
+    if (subagent && subagent.seat === null) subagent.seat = pickFriendSeat(s.seat, occupiedSeats(next));
+  }
 
   switch (ev.event) {
     case "SessionStart":

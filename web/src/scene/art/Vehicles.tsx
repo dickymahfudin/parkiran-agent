@@ -1,6 +1,6 @@
 import { useMemo } from "react";
 import * as THREE from "three";
-import { CARS, COVERED_CAR } from "../layout.ts";
+import { CARS, COVERED_CAR, PARKED_SCOOTERS } from "../layout.ts";
 import { canvasTexture, useModel } from "./assets.tsx";
 import { curve, loftGeometry, loftPoint, stations, type LoftSpec } from "./loft.ts";
 
@@ -436,11 +436,10 @@ export function Scooter({ x, z, yaw, color, plate, lens = MAT.lens, tail = MAT.t
   );
 }
 
-// Side by side, nose out like the cars, between the hatchback and the covered car (off every walking path).
-// Staggered in z so the handlebars and mirrors never meet; ~0.8 m wide each including the parked lean.
-export const SCOOTERS = [
-  { x: 1.3, z: 2.2, yaw: 0.06, color: "#1d3f86", plate: "B 3317 UQL" },
-  { x: 2.15, z: 1.95, yaw: -0.04, color: "#e7e8e9", plate: "B 6650 FBR" },
+// Between the hatchback and the covered car (off every walking path); ~0.8 m wide each including the parked lean.
+const SCOOTERS = [
+  { ...PARKED_SCOOTERS[0], color: "#1d3f86", plate: "B 3317 UQL" },
+  { ...PARKED_SCOOTERS[1], color: "#e7e8e9", plate: "B 6650 FBR" },
 ] as const;
 
 export function Vehicles() {

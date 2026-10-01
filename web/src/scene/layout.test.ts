@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { AWNING_POLES, COUNTER, DESPAWN_POINT, SEAT_PLACES, SIT_ROOT_BACK, SPAWN_POINT, STANDING_SPOTS, WARUNG_STOOLS, assignStandingSpots, assignWarungStools, planPath, type Vec2 } from "./layout.ts";
+import { AWNING_POLES, COUNTER, DESPAWN_POINT, SEAT_PLACES, SIT_ROOT_BACK, SPAWN_POINT, STANDING_SPOTS, WARUNG_STOOLS, assignStandingSpots, assignWarungStools, clearToStand, planPath, solidAt, type Vec2 } from "./layout.ts";
 
 /** Seated knees stick out about this far in front of the hip joint. */
 const KNEE_AHEAD = 0.45;
@@ -44,13 +44,31 @@ describe("walk paths", () => {
 });
 
 describe("standing spots", () => {
-  const ids = Array.from({ length: 14 }, (_, i) => `session-${i}`);
+  const ids = Array.from({ length: 30 }, (_, i) => `session-${i}`);
   // Everyone prefers the same spot: the worst case for collisions.
-  const sameHash = () => 4;
+  const sameSpot = () => 4;
+  const walks = seats.flatMap((seat) => [planPath(SPAWN_POINT, seat.approach, seat.node), planPath(seat.approach, COUNTER.point, COUNTER.node, seat.node)]);
 
-  test("nobody stands inside someone else, even when every spot is taken", () => {
-    const spots = [...assignStandingSpots(ids, sameHash).values()];
+  test("every spot is clear of sitters, vehicles and furniture, apart from the others and off the walking lanes", () => {
+    for (const spot of STANDING_SPOTS) {
+      expect(clearToStand(spot.point)).toBe(true);
+      for (const other of STANDING_SPOTS) if (other !== spot) expect(Math.hypot(spot.point[0] - other.point[0], spot.point[1] - other.point[1])).toBeGreaterThan(1.5);
+      for (const path of walks) expect(clearance(path, spot.point)).toBeGreaterThan(0.45);
+    }
+  });
+
+  test("every spot is reached in a straight line from its graph node without walking through anything", () => {
+    for (const spot of STANDING_SPOTS) {
+      const route = planPath(SPAWN_POINT, spot.point, spot.node);
+      const [a, b] = [route[route.length - 2]!, route[route.length - 1]!];
+      for (let t = 0; t <= 1; t += 0.05) expect(solidAt([a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t], 0.2)).toBe(false);
+    }
+  });
+
+  test("with more people than spots, nobody stands inside someone else or the furniture", () => {
+    const spots = [...assignStandingSpots(ids, sameSpot).values()];
     for (let i = 0; i < spots.length; i++) {
+      expect(clearToStand(spots[i]!.point)).toBe(true);
       for (let j = i + 1; j < spots.length; j++) {
         expect(Math.hypot(spots[i]!.point[0] - spots[j]!.point[0], spots[i]!.point[1] - spots[j]!.point[1])).toBeGreaterThan(0.6);
       }
@@ -59,8 +77,8 @@ describe("standing spots", () => {
   });
 
   test("earlier arrivals keep their place when someone new comes", () => {
-    const before = assignStandingSpots(ids.slice(0, 5), (id) => id.length * 7);
-    const after = assignStandingSpots(ids.slice(0, 6), (id) => id.length * 7);
+    const before = assignStandingSpots(ids.slice(0, 20), (id) => id.length * 7);
+    const after = assignStandingSpots(ids.slice(0, 21), (id) => id.length * 7);
     for (const [id, spot] of before) expect(after.get(id)).toEqual(spot);
   });
 });

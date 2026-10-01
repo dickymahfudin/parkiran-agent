@@ -270,8 +270,10 @@ FINGER_POSES = {
     "type": {"f": (22, 28, 16), "t": (15, 10)},
     "lighter": {"f": (70, 85, 55), "t": (10, -10)},
     "point": {"f": (70, 90, 55), "index": (0, 5, 0), "t": (30, 30)},
-    "phone": {"f": (55, 62, 40), "t": (8, 10)},
-    "phoneTap": {"f": (55, 62, 40), "t": (26, 32)},
+    # Phone grip (fitted against the web phone's box, no part inside it): index to ring flat behind the phone, round the
+    # far edge, pads on its front rim; the pinky under the bottom edge; the thumb over the screen, touching it on a tap.
+    "phone": {"f": (-12, 67, 66), "pinky": (20, 60, 30), "t": (30, -34, -38)},
+    "phoneTap": {"f": (-12, 67, 66), "pinky": (20, 60, 30), "t": (30, -38, -42)},
 }
 
 
@@ -280,7 +282,8 @@ def finger_curls(name):
     out = {}
     for f in FINGERS:
         out[f] = p.get(f.lower(), p["ring"] if f in ("Ring", "Pinky") and "ring" in p else p["f"])
-    out["Thumb"] = p["t"] + (p["t"][1],)
+    # Thumb: (base, middle) with the tip following the middle joint, or all three joints.
+    out["Thumb"] = p["t"] if len(p["t"]) == 3 else p["t"] + (p["t"][1],)
     return out
 
 

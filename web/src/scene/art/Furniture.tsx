@@ -1,7 +1,7 @@
 import { useMemo } from "react";
 import * as THREE from "three";
 import { mergeGeometries } from "three/examples/jsm/utils/BufferGeometryUtils.js";
-import { BENCHES, LOT, SEAT_PLACES } from "../layout.ts";
+import { BENCHES, GEROBAK, LOT, SEAT_PLACES } from "../layout.ts";
 import { canvasTexture, pbrMaterial, useModel, usePbr } from "./assets.tsx";
 
 // The Poly Haven pew seats at 0.63 m; squashed to a kampung bench height (≈0.47 m) the sitting clips expect.
@@ -121,7 +121,7 @@ function Gerobak() {
   const metal = useMemo(() => new THREE.MeshStandardMaterial({ color: "#5d6063", metalness: 0.7, roughness: 0.45 }), []);
   const tire = useMemo(() => new THREE.MeshStandardMaterial({ color: "#151515", roughness: 0.9 }), []);
   return (
-    <group position={[0.75, 0, -5.05]}>
+    <group position={[GEROBAK.x, 0, GEROBAK.z]}>
       <mesh position={[0, 0.72, 0]} material={woodMat} castShadow receiveShadow>
         <boxGeometry args={[1.4, 0.55, 0.62]} />
       </mesh>

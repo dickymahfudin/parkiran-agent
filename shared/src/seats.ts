@@ -33,8 +33,8 @@ export function pickSeat(occupied: ReadonlySet<string>): string | null {
   return SEATS.find((s) => !occupied.has(s.id))?.id ?? null;
 }
 
+/** Next to the parent when that seat is free, else any free seat: a friend only stands when the lot is full. */
 export function pickFriendSeat(parentSeat: string | null, occupied: ReadonlySet<string>): string | null {
-  if (parentSeat === null) return null;
-  const def = SEATS.find((s) => s.id === parentSeat);
-  return def?.neighbours.find((n) => !occupied.has(n)) ?? null;
+  const def = parentSeat === null ? undefined : SEATS.find((s) => s.id === parentSeat);
+  return def?.neighbours.find((n) => !occupied.has(n)) ?? pickSeat(occupied);
 }
