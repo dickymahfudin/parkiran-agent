@@ -17,6 +17,7 @@ import { SOLE_AHEAD, loweredAnkle, placeSandal, reachLeg, type SandalAnchor } fr
 import { SANDAL_THICKNESS, Sandal } from "./Sandal.tsx";
 import type { Look } from "./identity.ts";
 import { BubbleIcon, type SmokeSource } from "./props.tsx";
+import { CrewHead } from "./Crew.tsx";
 import { characterRoots } from "./registry.ts";
 import { rigPlay, rigTime, type ClipsJson, type RigPlay } from "./rig.ts";
 
@@ -323,8 +324,9 @@ function PersonView({ brain, look, tag, friend, smoke, steam, onSelect, trackId 
   const tipHand = useRef<THREE.Mesh>(null);
   const flame = useRef<THREE.Mesh>(null);
   const flameR = useRef<THREE.Mesh>(null);
-  // The need bubble and the Zzz are mounted only while shown: each Html costs a projection and style writes a frame.
-  const [overlay, setOverlay] = useState<{ bubble: NeedKind | null; zzz: boolean }>({ bubble: null, zzz: false });
+  // The need bubble, the Zzz and the done badge are mounted only while shown: each Html costs a projection and style
+  // writes a frame.
+  const [overlay, setOverlay] = useState<{ bubble: NeedKind | null; zzz: boolean; done: boolean }>({ bubble: null, zzz: false, done: false });
   const shownOverlay = useRef(overlay);
   const tipMat = useMemo(() => new THREE.MeshStandardMaterial({ color: "#3a1a0a", emissive: "#ff5a1f", emissiveIntensity: 0 }), []);
 
@@ -385,8 +387,11 @@ function PersonView({ brain, look, tag, friend, smoke, steam, onSelect, trackId 
     const cap = new THREE.Group();
     // The skull's centre sits 4 cm in front of the head bone (measured on the MPFB mesh): the crown is centred there.
     if (look.cap) attach(rig, "Head", cap, new THREE.Vector3(0, CAP.y, CAP.z), new THREE.Vector3(0, 0, 1));
-    return { handCig, mouthCig, lighter, lighterR, phoneL, phoneR, cup, carry, feet, cap, head: bone("Head") };
-  }, [rig, asset.meta.mouth, look.cap]);
+    // Crew accessory (peci or glasses), on the skull centre like the cap.
+    const crewHead = new THREE.Group();
+    if (look.accessory) attach(rig, "Head", crewHead, new THREE.Vector3(0, CAP.y, CAP.z), new THREE.Vector3(0, 0, 1));
+    return { handCig, mouthCig, lighter, lighterR, phoneL, phoneR, cup, carry, feet, cap, crewHead, head: bone("Head"), neck: bone("Neck") };
+  }, [rig, asset.meta.mouth, look.cap, look.accessory]);
 
   const actions = useRef(new Map<string, THREE.AnimationAction>());
   useEffect(
@@ -404,7 +409,10 @@ function PersonView({ brain, look, tag, friend, smoke, steam, onSelect, trackId 
     return () => void characterRoots.delete(trackId);
   }, [trackId]);
   const flameWasOn = useRef(false);
+  const doneWasOn = useRef(false);
   const legIk = useRef(false);
+  /** Head turn towards a chatting neighbour, eased; the clip pose of neck and head is kept to undo it next frame. */
+  const headTurn = useRef({ now: 0, applied: false, neck: new THREE.Quaternion(), head: new THREE.Quaternion() });
   const lidOpen = useRef(1);
 
   const action = (clip: THREE.AnimationClip) => {
@@ -418,13 +426,13 @@ function PersonView({ brain, look, tag, friend, smoke, steam, onSelect, trackId 
   };
   const used = useMemo(() => new Set<THREE.AnimationAction>(), []);
   const apply = (play: RigPlay, t: number, weight: number, typingRate: number) => {
-    const set = (clip: THREE.AnimationClip, name: string) => {
+    const set = (clip: THREE.AnimationClip, name: string, at = t) => {
       const a = action(clip);
       // A stopped action (effect cleanup, e.g. StrictMode's remount) would leave the rest pose showing.
       if (!a.isScheduled()) a.play();
       a.enabled = true;
       a.setEffectiveWeight(weight);
-      a.time = rigTime(name, t, asset.meta, typingRate);
+      a.time = rigTime(name, at, asset.meta, typingRate);
       used.add(a);
     };
     if ("full" in play) {
@@ -433,7 +441,7 @@ function PersonView({ brain, look, tag, friend, smoke, steam, onSelect, trackId 
       set(clip, play.full);
     } else {
       set(asset.part(play.lower, "lower"), play.lower);
-      set(asset.part(play.upper, "upper"), play.upper);
+      set(asset.part(play.upper, "upper"), play.upper, play.upperAt ?? t);
     }
   };
 
@@ -463,6 +471,12 @@ function PersonView({ brain, look, tag, friend, smoke, steam, onSelect, trackId 
       for (const leg of props.feet) leg.chain.forEach((b, i) => b.quaternion.copy(leg.clipPose[i]!));
       legIk.current = false;
     }
+    const lk = headTurn.current;
+    if (lk.applied) {
+      props.neck.quaternion.copy(lk.neck);
+      props.head.quaternion.copy(lk.head);
+      lk.applied = false;
+    }
     used.clear();
     const w = f.prevClip === null ? 1 : SMOOTH(f.blend);
     const play = rigPlay(f.clip, seated);
@@ -470,6 +484,14 @@ function PersonView({ brain, look, tag, friend, smoke, steam, onSelect, trackId 
     if (f.prevClip !== null && w < 1) apply(rigPlay(f.prevClip, seated), f.prevClipTime, 1 - w, f.typingRate);
     for (const a of actions.current.values()) if (!used.has(a)) a.enabled = false;
     mixer.update(0);
+    lk.now += (f.look - lk.now) * (1 - Math.exp(-4 * dt));
+    if (Math.abs(lk.now) > 1e-3) {
+      lk.neck.copy(props.neck.quaternion);
+      lk.head.copy(props.head.quaternion);
+      props.neck.rotateY(lk.now * 0.4);
+      props.head.rotateY(lk.now * 0.6);
+      lk.applied = true;
+    }
     root.current.updateMatrixWorld(true);
     // Seats higher than the clips' (car hoods): the whole body is lifted, so stretch the legs back down to the ground.
     if (lift > 0.005) {
@@ -529,6 +551,8 @@ function PersonView({ brain, look, tag, friend, smoke, steam, onSelect, trackId 
     props.phoneR.visible = p.phone && !seated;
     if (p.flame && !flameWasOn.current) sound.lighter();
     flameWasOn.current = p.flame;
+    if (p.done && !doneWasOn.current) sound.done();
+    doneWasOn.current = p.done;
     for (const fl of [flame.current, flameR.current]) {
       if (!fl) continue;
       fl.visible = p.flame;
@@ -557,8 +581,8 @@ function PersonView({ brain, look, tag, friend, smoke, steam, onSelect, trackId 
       steam.world.y += 0.06;
     }
 
-    if (shownOverlay.current.bubble !== p.bubble || shownOverlay.current.zzz !== p.zzz) {
-      shownOverlay.current = { bubble: p.bubble, zzz: p.zzz };
+    if (shownOverlay.current.bubble !== p.bubble || shownOverlay.current.zzz !== p.zzz || shownOverlay.current.done !== p.done) {
+      shownOverlay.current = { bubble: p.bubble, zzz: p.zzz, done: p.done };
       setOverlay(shownOverlay.current);
     }
   });
@@ -608,6 +632,7 @@ function PersonView({ brain, look, tag, friend, smoke, steam, onSelect, trackId 
           </>,
           props.cap,
         )}
+      {look.accessory && createPortal(<CrewHead accessory={look.accessory} />, props.crewHead)}
       {/* Laptop on the thighs while seated (root space, from the seated hips). */}
       <group ref={lap} position={[0, sit[1] + 0.085, sit[2] + 0.36]}>
         <mesh material={MAT.laptop} castShadow>
@@ -641,6 +666,13 @@ function PersonView({ brain, look, tag, friend, smoke, steam, onSelect, trackId 
           <Html position={[0.28, -0.08, 0]} center zIndexRange={[30, 0]} style={{ pointerEvents: "none" }}>
             <div className="bubble" data-kind={overlay.bubble} style={{ display: "flex" }}>
               <BubbleIcon />
+            </div>
+          </Html>
+        )}
+        {overlay.done && (
+          <Html position={[0.26, -0.06, 0]} center zIndexRange={[30, 0]} style={{ pointerEvents: "none" }}>
+            <div className="done-badge">
+              <Icon name="done" />
             </div>
           </Html>
         )}

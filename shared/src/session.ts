@@ -1,5 +1,5 @@
 import type { HookEventName } from "./events.ts";
-import type { WorkKind } from "./tools.ts";
+import type { ToolGroup, WorkKind } from "./tools.ts";
 
 export type Phase = "working" | "waiting" | "idle" | "compacting" | "leaving";
 export type NeedKind = "permission" | "question" | "input";
@@ -25,6 +25,16 @@ export interface Subagent {
   lastTool: string | null;
 }
 
+/** A session's state as the timeline shows it: thinking and tool calls alternate every few seconds, so both are work. */
+export type TimelineState = "working" | "waiting" | "idle" | "compacting";
+
+export interface TimelineEntry {
+  state: TimelineState;
+  at: number;
+}
+
+export type Milestone = "calls" | "work" | "compactions";
+
 export interface OpenTool {
   name: string;
   startedAt: number;
@@ -47,6 +57,20 @@ export interface Session {
   dozing: boolean;
   toolCalls: number;
   failures: number;
+  /** Finished compactions (kopi runs): the empty cups stack up by the seat. */
+  compactions: number;
+  /** Finished tool calls by group (subagents included, like `toolCalls`). */
+  toolMix: Partial<Record<ToolGroup, number>>;
+  /** Times the session asked the user for something (permission, question, input). */
+  asks: number;
+  /** Total time the session waited for the user on handled needs (ms); an open need adds `now − need.since`. */
+  waitedMs: number;
+  /** State changes over roughly the last hour (oldest first; the first entry may start before the hour). */
+  timeline: TimelineEntry[];
+  /** Time spent working before the current timeline entry (ms), for the work milestones. */
+  workedMs: number;
+  /** Milestones already announced, e.g. "calls:100". */
+  milestones: string[];
   startedAt: number;
   lastEventAt: number;
   lastEvent: HookEventName;
@@ -73,6 +97,7 @@ export type Cue =
   | { kind: "compactDone"; sessionId: string }
   | { kind: "friendArrived"; sessionId: string; agentId: string }
   | { kind: "friendLeft"; sessionId: string; agentId: string }
+  | { kind: "milestone"; sessionId: string; milestone: Milestone; value: number }
   | { kind: "dozeStarted"; sessionId: string }
   | { kind: "woke"; sessionId: string }
   | { kind: "leaving"; sessionId: string }

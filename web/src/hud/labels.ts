@@ -31,6 +31,10 @@ export type IconName =
   | "bellOff"
   | "day"
   | "night"
+  | "morning"
+  | "evening"
+  | "auto"
+  | "milestone"
   | "close";
 
 export interface StateLabel {
@@ -117,6 +121,8 @@ export function cueLine(cue: Cue, session?: Pick<PublicSession, "need">): CueLin
       return { icon: "friendIn", text: "subagent joined", mood: "working" };
     case "friendLeft":
       return { icon: "friendOut", text: "subagent left", mood: "away" };
+    case "milestone":
+      return { icon: "milestone", text: milestoneText(cue.milestone, cue.value), mood: "working" };
     case "dozeStarted":
       return { icon: "dozing", text: "dozed off", mood: "dozing" };
     case "woke":
@@ -126,6 +132,14 @@ export function cueLine(cue: Cue, session?: Pick<PublicSession, "need">): CueLin
     case "removed":
       return { icon: "gone", text: "left the lot", mood: "away" };
   }
+}
+
+const ordinal = (n: number): string => `${n}${n % 10 === 1 && n % 100 !== 11 ? "st" : n % 10 === 2 && n % 100 !== 12 ? "nd" : n % 10 === 3 && n % 100 !== 13 ? "rd" : "th"}`;
+
+function milestoneText(milestone: Extract<Cue, { kind: "milestone" }>["milestone"], value: number): string {
+  if (milestone === "calls") return `${value} tool calls`;
+  if (milestone === "work") return `${value} h of work`;
+  return `${ordinal(value)} compaction, kopi lagi`;
 }
 
 /** Needs first: those are what the user acts on. */
@@ -166,4 +180,55 @@ export function formatDuration(ms: number): string {
   if (m < 60) return `${m} min`;
   const h = Math.floor(m / 60);
   return h < 24 ? `${h} h ${m % 60} min` : `${Math.floor(h / 24)} d ${h % 24} h`;
+}
+
+const MCP_TOOL = /^mcp__(.+?)__(.+)$/;
+
+/**
+ * Tool names as people read them: `mcp__Claude_Browser__javascript_tool` → "Claude Browser › javascript_tool". Plugin
+ * servers (`plugin_<plugin>_<server>`) drop the prefix and a repeated name; id-like server names are shortened.
+ */
+export function formatToolName(name: string): string {
+  const m = MCP_TOOL.exec(name);
+  if (!m) return name;
+  let server = m[1]!;
+  if (server.startsWith("plugin_")) {
+    server = server.slice("plugin_".length);
+    const half = (server.length - 1) / 2;
+    if (Number.isInteger(half) && server[half] === "_" && server.slice(0, half) === server.slice(half + 1)) server = server.slice(0, half);
+  }
+  if (/^[0-9a-f]{8}-[0-9a-f-]+$/i.test(server)) server = server.slice(0, 8);
+  return `${server.replace(/_/g, " ")} › ${m[2]}`;
+}
+
+type Twin = Pick<PublicSession, "id" | "project" | "branch" | "startedAt">;
+const twinKey = (s: Twin): string => `${s.project ?? ""}\u0000${s.branch ?? ""}`;
+
+/**
+ * Numbers for sessions that share a project and branch, so the lot can tell them apart (`#2`, `#3`). A number never
+ * changes while its session and a twin are around; newcomers count on from the highest; a session left alone loses
+ * its number. Pure: pass the previous result back in.
+ */
+export function assignTwinNumbers(previous: ReadonlyMap<string, number>, sessions: readonly Twin[]): Map<string, number> {
+  const groups = new Map<string, Twin[]>();
+  for (const s of sessions) {
+    const g = groups.get(twinKey(s));
+    if (g) g.push(s);
+    else groups.set(twinKey(s), [s]);
+  }
+  const out = new Map<string, number>();
+  for (const group of groups.values()) {
+    if (group.length < 2) continue;
+    group.sort((a, b) => a.startedAt - b.startedAt || a.id.localeCompare(b.id));
+    let next = Math.max(0, ...group.map((s) => previous.get(s.id) ?? 0)) + 1;
+    for (const s of group) out.set(s.id, previous.get(s.id) ?? next++);
+  }
+  return out;
+}
+
+/** Project name, with the twin number from `assignTwinNumbers` when it is #2 or later. */
+export function sessionName(s: Pick<PublicSession, "id" | "project">, twins: ReadonlyMap<string, number>): string {
+  const n = twins.get(s.id);
+  const project = s.project ?? "?";
+  return n && n > 1 ? `${project} #${n}` : project;
 }

@@ -7,7 +7,7 @@ import { rigPlay, rigTime, sitHipsBack, type ClipsJson } from "./rig.ts";
 
 const ALL_CLIPS: Clip[] = [
   "walk", "standIdle", "sitDown", "standUp", "sitIdle", "type", "think", "smoke", "sip", "stretch", "chat", "frustrated",
-  "patPockets", "lookAround", "lightUp", "drag", "sigh", "pocketCig", "doze", "buy", "stubOut", "closeLaptop", "wave",
+  "patPockets", "lookAround", "lightUp", "drag", "sigh", "pocketCig", "doze", "buy", "stubOut", "closeLaptop", "wave", "phone", "push",
 ];
 
 const CLIPS_JSON = join(import.meta.dir, "..", "..", "..", "public", "assets", "character", "clips.json");
@@ -33,6 +33,11 @@ describe("rig clip mapping", () => {
     expect(rigPlay("smoke", false)).toEqual({ full: "smokeStand" });
     expect(rigPlay("chat", false)).toEqual({ full: "talk" });
     expect(rigPlay("stretch", false)).toEqual({ lower: "standIdle", upper: "stretch" });
+    // The wave was keyed standing: seated, the legs stay on the seat.
+    expect(rigPlay("wave", true)).toEqual({ lower: "sitIdle", upper: "wave" });
+    expect(rigPlay("wave", false)).toEqual({ full: "wave" });
+    // A street vendor walks with both hands held forward on the cart.
+    expect(rigPlay("push", false)).toMatchObject({ lower: "walk", upper: "interact" });
   });
 
   test("walk plays faster to match the scene walk speed; typing follows the tool rate; one-shots clamp", () => {

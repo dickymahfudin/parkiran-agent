@@ -26,6 +26,15 @@ const KINDS: Record<string, WorkKind> = {
 /** Tools that put the session in "needs me" until answered. */
 export const QUESTION_TOOLS: ReadonlySet<string> = new Set(["AskUserQuestion", "ExitPlanMode"]);
 
+/** How tool calls are counted for a session's tool mix: the work kinds, with MCP tools on their own. */
+export type ToolGroup = Exclude<WorkKind, "think"> | "mcp";
+
+export function toolGroupOf(toolName: string | undefined): ToolGroup {
+  if (toolName?.startsWith("mcp__")) return "mcp";
+  const kind = workKindOf(toolName);
+  return kind === "think" ? "other" : kind;
+}
+
 export function workKindOf(toolName: string | undefined): WorkKind {
   if (toolName === undefined) return "think";
   return KINDS[toolName] ?? "other";

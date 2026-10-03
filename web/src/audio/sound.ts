@@ -177,6 +177,70 @@ class SoundEngine {
     }
   }
 
+  /** A soft single "ting" when a session finishes its turn: quieter and shorter than the needs-you chime. */
+  done(): void {
+    const ctx = this.ctx;
+    if (!ctx || !this.enabled || !this.bus) return;
+    const t = ctx.currentTime;
+    for (const [freq, peak] of [[1760, 0.11], [3520, 0.025]] as const) {
+      const o = ctx.createOscillator();
+      o.frequency.value = freq;
+      const g = ctx.createGain();
+      g.gain.setValueAtTime(0, t);
+      g.gain.linearRampToValueAtTime(peak, t + 0.008);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + 1.1);
+      o.connect(g).connect(this.bus);
+      o.start(t);
+      o.stop(t + 1.2);
+    }
+  }
+
+  /**
+   * A street vendor's call, one group: a spoon on a bakso bowl ("ting-ting-ting") or a ladle on the wok ("tek-tek-tek").
+   * `loudness` 0…1 from the distance, `pan` −1 (left) … 1 (right).
+   */
+  cartCall(kind: "bakso" | "nasgor", loudness: number, pan: number): void {
+    const ctx = this.ctx;
+    if (!ctx || !this.enabled || !this.bus || !this.noise || loudness < 0.02) return;
+    const out = ctx.createStereoPanner();
+    out.pan.value = Math.max(-1, Math.min(1, pan));
+    const level = ctx.createGain();
+    level.gain.value = loudness;
+    level.connect(out).connect(this.bus);
+    const hits = kind === "bakso" ? 3 + Math.floor(Math.random() * 2) : 4 + Math.floor(Math.random() * 3);
+    const gap = kind === "bakso" ? 0.2 : 0.15;
+    for (let i = 0; i < hits; i++) {
+      const t = ctx.currentTime + 0.02 + i * gap + Math.random() * 0.02;
+      if (kind === "bakso") {
+        // A small china bowl: a bright partial over a lower one, ringing out quickly.
+        for (const [freq, peak, decay] of [[2350, 0.16, 0.35], [3910, 0.06, 0.2]] as const) {
+          const o = ctx.createOscillator();
+          o.frequency.value = freq * (0.99 + Math.random() * 0.02);
+          const g = ctx.createGain();
+          g.gain.setValueAtTime(0, t);
+          g.gain.linearRampToValueAtTime(peak, t + 0.004);
+          g.gain.exponentialRampToValueAtTime(0.0001, t + decay);
+          o.connect(g).connect(level);
+          o.start(t);
+          o.stop(t + decay + 0.05);
+        }
+      } else {
+        // Steel on a wok: a short knock with a dull ring.
+        const src = ctx.createBufferSource();
+        src.buffer = this.noise;
+        const f = ctx.createBiquadFilter();
+        f.type = "bandpass";
+        f.frequency.value = 1150 + Math.random() * 150;
+        f.Q.value = 6;
+        const g = ctx.createGain();
+        g.gain.setValueAtTime(0.5, t);
+        g.gain.exponentialRampToValueAtTime(0.0001, t + 0.09);
+        src.connect(f).connect(g).connect(level);
+        src.start(t, Math.random() * 2.5, 0.1);
+      }
+    }
+  }
+
   /** Lighter: the flint "cetek" and a short gas whoosh. */
   lighter(): void {
     const ctx = this.ctx;

@@ -13,6 +13,7 @@ describe("notifier", () => {
   test("titles name the project and what it needs", () => {
     expect(notificationTitle(base)).toBe("warung-app needs permission");
     expect(notificationTitle({ ...base, need: { ...base.need!, kind: "question" } })).toBe("warung-app has a question");
+    expect(notificationTitle(base, "warung-app #2")).toBe("warung-app #2 needs permission");
   });
 
   test("chimes on a new need, repeats, and stops once acknowledged or resolved", () => {

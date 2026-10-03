@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import type { PublicSession } from "../../../shared/src/protocol.ts";
-import { cueLine, formatAge, moodCounts, stateLabel } from "./labels.ts";
+import { assignTwinNumbers, cueLine, formatAge, formatToolName, moodCounts, sessionName, stateLabel } from "./labels.ts";
 
 const session = (over: Partial<PublicSession>): PublicSession =>
   ({ id: "s", phase: "idle", work: "other", need: null, dozing: false, lastOutcome: null, subagents: {}, ...over }) as unknown as PublicSession;
@@ -25,6 +25,12 @@ describe("labels", () => {
     expect(cueLine(reminder, { need: { kind: "question" } as PublicSession["need"] }).text).toBe("still waiting");
   });
 
+  test("milestones read as plain facts (the kopi joke stays) and never count as needing you", () => {
+    expect(cueLine({ kind: "milestone", sessionId: "s", milestone: "calls", value: 100 })).toEqual({ icon: "milestone", text: "100 tool calls", mood: "working" });
+    expect(cueLine({ kind: "milestone", sessionId: "s", milestone: "work", value: 2 }).text).toBe("2 h of work");
+    expect(cueLine({ kind: "milestone", sessionId: "s", milestone: "compactions", value: 2 }).text).toBe("2nd compaction, kopi lagi");
+  });
+
   test("ages use English units", () => {
     expect(formatAge(2000)).toBe("now");
     expect(formatAge(42_000)).toBe("42s");
@@ -39,5 +45,34 @@ describe("labels", () => {
       { mood: "working", count: 1 },
       { mood: "idle", count: 2 },
     ]);
+  });
+
+  test("MCP tool names read as server › tool; built-in tools stay as they are", () => {
+    expect(formatToolName("mcp__Claude_Browser__javascript_tool")).toBe("Claude Browser › javascript_tool");
+    expect(formatToolName("mcp__plugin_context-mode_context-mode__ctx_execute")).toBe("context-mode › ctx_execute");
+    expect(formatToolName("mcp__plugin_figma_desktop__get_code")).toBe("figma desktop › get_code");
+    expect(formatToolName("mcp__1a59c906-04da-521d-bda7-7f71b9f9e01c__batch")).toBe("1a59c906 › batch");
+    expect(formatToolName("Bash")).toBe("Bash");
+    expect(formatToolName("mcp__broken")).toBe("mcp__broken");
+  });
+
+  test("twins of one project and branch get #2, #3 by start time; a lone session gets none", () => {
+    const twin = (id: string, startedAt: number, project = "parkiran", branch: string | null = "main") => ({ id, project, branch, startedAt });
+    const a = twin("a", 1);
+    const b = twin("b", 2);
+    const other = twin("o", 0, "parkiran", "dev");
+    let twins = assignTwinNumbers(new Map(), [b, a, other]);
+    expect([...twins]).toEqual([["a", 1], ["b", 2]]);
+    expect(sessionName(a, twins)).toBe("parkiran");
+    expect(sessionName(b, twins)).toBe("parkiran #2");
+    expect(sessionName({ id: "o", project: "parkiran" }, twins)).toBe("parkiran");
+    // The first one leaves and a newcomer arrives: #2 keeps its number, the newcomer counts on.
+    twins = assignTwinNumbers(twins, [b, twin("c", 3)]);
+    expect(twins.get("b")).toBe(2);
+    expect(twins.get("c")).toBe(3);
+    // Left alone, the number goes.
+    twins = assignTwinNumbers(twins, [b]);
+    expect(twins.size).toBe(0);
+    expect(sessionName(b, twins)).toBe("parkiran");
   });
 });

@@ -256,4 +256,68 @@ describe("Brain", () => {
     expect(last.yaw).toBeCloseTo(seat.yaw, 3);
     expect(Math.hypot(last.x - seat.approach[0], last.z - seat.approach[1])).toBeLessThan(0.01);
   });
+
+  test("turn done: stretches with a check badge, then goes idle (laptop shut, phone)", () => {
+    const b = seatedBrain();
+    b.setTarget({ kind: "seated", activity: "idle" }, null, 1);
+    b.react("done");
+    let badge = false;
+    const { clips, last } = runFor(b, 10, (f) => (badge ||= f.props.done));
+    expect(clips.has("stretch")).toBe(true);
+    expect(badge).toBe(true);
+    expect(last.props.done).toBe(false);
+    expect(last).toMatchObject({ clip: "phone", props: { laptop: "closed", phone: true } });
+  });
+
+  test("turn done after a denied permission does not cut into the sigh", () => {
+    const b = seatedBrain();
+    b.setTarget({ kind: "needs", need: "permission" }, null, 1);
+    runFor(b, 6);
+    b.setTarget({ kind: "seated", activity: "idle" }, null, 2);
+    b.react("done");
+    const { clips } = runFor(b, 12);
+    expect(clips.has("sigh")).toBe(true);
+    expect(clips.has("stretch")).toBe(false);
+  });
+
+  test("walking in and sitting down reports the arrival once (to greet the neighbours); a wave plays seated", () => {
+    const b = new Brain({ seed: 3, home, atHome: false, target: WORK });
+    b.setTarget(WORK, null, 0);
+    let arrivals = 0;
+    runFor(b, 30, () => (arrivals += b.takeArrival() ? 1 : 0));
+    expect(arrivals).toBe(1);
+    b.react("wave");
+    b.react("wave");
+    let waves = 0;
+    let prev: Clip | null = null;
+    const { last } = runFor(b, 6, (f) => {
+      if (f.clip === "wave" && prev !== "wave") waves++;
+      prev = f.clip;
+    });
+    expect(waves).toBe(1);
+    expect(last).toMatchObject({ clip: "type", sit: 1 });
+    // A person already at home on page load never reports an arrival.
+    const loaded = seatedBrain();
+    runFor(loaded, 3, () => expect(loaded.takeArrival()).toBe(false));
+  });
+
+  test("idle neighbours chat with heads turned to each other, then go back to the phone", () => {
+    const b = seatedBrain({ kind: "seated", activity: "idle" });
+    runFor(b, 14);
+    const right: [number, number] = [home.point[0] + 0.6, home.point[1]];
+    b.setChat(right);
+    const chatting = runFor(b, 3).last;
+    expect(chatting.clip).toBe("chat");
+    expect(chatting.props.phone).toBe(false);
+    expect(Math.abs(chatting.look)).toBeGreaterThan(0.5);
+    b.setChat(null);
+    const after = runFor(b, 3).last;
+    expect(after).toMatchObject({ clip: "phone", look: 0 });
+  });
+
+  test("a chat window opening while working changes nothing", () => {
+    const b = seatedBrain();
+    b.setChat([home.point[0] + 0.6, home.point[1]]);
+    expect(runFor(b, 3).last.clip).toBe("type");
+  });
 });

@@ -25,6 +25,8 @@ interface Slot {
   ride?: boolean;
   /** Seat surface height (m); the clips are made for 0.45, car hoods are higher. */
   seatY?: number;
+  /** Head turn towards a chatting neighbour (rad). */
+  look?: number;
 }
 
 const SLOTS: Slot[] = [
@@ -40,7 +42,9 @@ const SLOTS: Slot[] = [
   { label: "santai: rokok", clip: "smoke", t: 0.9, seated: true, props: { cigarette: "lit" } },
   { label: "santai: ngopi", clip: "sip", t: 1.0, seated: true, props: { cup: true } },
   { label: "santai: stretching", clip: "stretch", t: 1.6, seated: true },
-  { label: "santai: ngobrol", clip: "chat", t: 0.6, seated: true },
+  { label: "santai: ngobrol", clip: "chat", t: 0.6, seated: true, look: 0.9, props: { laptop: "closed", cigarette: "lit" } },
+  { label: "turn done (stretch)", clip: "stretch", t: 1.4, seated: true, props: { done: true } },
+  { label: "wave (duduk)", clip: "wave", t: 1.0, seated: true },
   { label: "gagal: kesel", clip: "frustrated", t: 1.1, seated: true },
   { label: "idle (duduk)", clip: "sitIdle", t: 2.5, seated: true },
   { label: "ketiduran", clip: "doze", t: 1, seated: true, props: { zzz: true } },
@@ -56,7 +60,7 @@ const SLOTS: Slot[] = [
 
 const SPACING_X = 1.25;
 const SPACING_Z = 2.1;
-const BASE_PROPS: PropState = { laptop: "open", cigarette: "none", lighter: false, flame: false, cup: false, bubble: null, zzz: false, phone: false };
+const BASE_PROPS: PropState = { laptop: "open", cigarette: "none", lighter: false, flame: false, cup: false, bubble: null, zzz: false, phone: false, done: false };
 
 function frozen(slot: Slot, x: number, z: number): Animator {
   const frame: Frame = {
@@ -74,6 +78,7 @@ function frozen(slot: Slot, x: number, z: number): Animator {
     blend: 1,
     typingRate: slot.typingRate ?? 1,
     walkSpeed: 1.25,
+    look: slot.look ?? 0,
     props: { ...BASE_PROPS, ...(slot.seated ? {} : { laptop: "closed" }), ...slot.props },
   };
   const live = new URLSearchParams(location.search).has("live");

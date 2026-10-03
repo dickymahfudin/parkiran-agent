@@ -2,6 +2,7 @@
 // character) only silences the repeating chime; the real session state never changes from here.
 import type { PublicSession } from "../../../shared/src/protocol.ts";
 import { sound } from "../audio/sound.ts";
+import { sessionName } from "../hud/labels.ts";
 import { useApp } from "../state/store.ts";
 import { NOTIFY_EVERY_MS, notificationTitle, shouldChime } from "./rules.ts";
 
@@ -9,7 +10,8 @@ function systemNotify(s: PublicSession): void {
   if (typeof Notification === "undefined" || Notification.permission !== "granted") return;
   // Only when you are elsewhere; on the page the bubble and chime are enough.
   if (document.visibilityState === "visible" && document.hasFocus()) return;
-  const n = new Notification(notificationTitle(s), { body: s.branch ? `branch ${s.branch}` : "", tag: `parkiran-${s.id}`, silent: true });
+  const name = s.project ? sessionName(s, useApp.getState().twins) : undefined;
+  const n = new Notification(notificationTitle(s, name), { body: s.branch ? `branch ${s.branch}` : "", tag: `parkiran-${s.id}`, silent: true });
   n.onclick = () => {
     window.focus();
     useApp.getState().select(s.id);

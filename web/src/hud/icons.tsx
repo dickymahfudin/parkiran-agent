@@ -5,7 +5,9 @@ import {
   CigaretteOff,
   CircleCheck,
   CircleHelp,
+  Clock,
   Coffee,
+  Flag,
   Flame,
   Footprints,
   Hand,
@@ -19,6 +21,7 @@ import {
   RotateCcw,
   Sun,
   Sunrise,
+  Sunset,
   TriangleAlert,
   UserMinus,
   UserPlus,
@@ -56,6 +59,10 @@ const ICONS: Record<IconName, LucideIcon> = {
   bellOff: BellOff,
   day: Sun,
   night: Moon,
+  morning: Sunrise,
+  evening: Sunset,
+  auto: Clock,
+  milestone: Flag,
   close: X,
 };
 

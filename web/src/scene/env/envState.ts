@@ -2,6 +2,7 @@ import * as THREE from "three";
 import { applyTimeOverride, sunPosition } from "../../../../shared/src/sun.ts";
 import { useApp } from "../../state/store.ts";
 import { lightingFor, type Lighting } from "./dayNight.ts";
+import { SceneTimeEase } from "./timeOfDay.ts";
 
 export const DEFAULT_LAT = -6.2;
 export const DEFAULT_LON = 106.8;
@@ -25,8 +26,12 @@ export function directionFrom(azimuthDeg: number, elevationDeg: number, out = ne
   return out.set(Math.cos(e) * Math.sin(a), Math.sin(e), -Math.cos(e) * Math.cos(a));
 }
 
+const timeEase = new SceneTimeEase();
+
 export function updateEnvState(): Lighting {
-  const date = sceneDate();
+  const wall = Date.now();
+  // A new time of day (preset, auto, dev input) eases the sun round the clock instead of jumping.
+  const date = new Date(timeEase.step(sceneDate(new Date(wall)).getTime(), useApp.getState().timeOverride ?? "auto", wall));
   const cfg = useApp.getState().config;
   const sun = sunPosition(date, cfg?.lat ?? DEFAULT_LAT, cfg?.lon ?? DEFAULT_LON);
   const lighting = lightingFor(sun);

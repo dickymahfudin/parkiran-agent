@@ -1,6 +1,8 @@
 import { create } from "zustand";
 import type { ClientConfig, PublicSession, ServerMessage, UsageSnapshot } from "../../../shared/src/protocol.ts";
 import type { Cue } from "../../../shared/src/session.ts";
+import { assignTwinNumbers } from "../hud/labels.ts";
+import { isTimeMode, presetTime, type TimeMode } from "../scene/env/timeOfDay.ts";
 
 export type ConnectionStatus = "connecting" | "open" | "closed";
 
@@ -30,11 +32,20 @@ function pref(key: string, fallback: boolean): boolean {
   }
 }
 
-function savePref(key: string, value: boolean): void {
+function savePref(key: string, value: boolean | string): void {
   try {
-    localStorage.setItem(`parkiran:${key}`, value ? "1" : "0");
+    localStorage.setItem(`parkiran:${key}`, typeof value === "string" ? value : value ? "1" : "0");
   } catch {
     // Not persisted; the toggle still works for this visit.
+  }
+}
+
+function savedTimeMode(): TimeMode {
+  try {
+    const v = localStorage.getItem("parkiran:timeMode");
+    return isTimeMode(v) ? v : "auto";
+  } catch {
+    return "auto";
   }
 }
 
@@ -49,7 +60,9 @@ interface AppState {
   cueLog: CueEntry[];
   cueSeq: number;
   selectedId: string | null;
-  /** Dev override of the scene clock, "HH:MM" (from ?time= or the HUD). */
+  /** Twin number per session id for sessions sharing a project and branch (`assignTwinNumbers`). */
+  twins: ReadonlyMap<string, number>;
+  /** Fixed scene clock, "HH:MM": a time-of-day preset, `?time=` or the dev input; null follows the local clock. */
   timeOverride: string | null;
   assetErrors: string[];
   readyParts: ScenePart[];
@@ -66,6 +79,8 @@ interface AppState {
   acknowledged: Record<string, number>;
   setConnection(status: ConnectionStatus, error?: string | null): void;
   setTimeOverride(value: string | null): void;
+  /** Picks a time-of-day preset (or auto) and remembers it in this browser. */
+  setTimeMode(mode: TimeMode): void;
   reportAssetError(message: string): void;
   markReady(part: ScenePart): void;
   apply(msg: ServerMessage): void;
@@ -89,7 +104,8 @@ export const useApp = create<AppState>((set) => ({
   cueLog: [],
   cueSeq: 0,
   selectedId: null,
-  timeOverride: params.get("time"),
+  twins: new Map(),
+  timeOverride: params.get("time") ?? presetTime(savedTimeMode()),
   assetErrors: [],
   readyParts: [],
   cameraMode: params.has("cinematic") ? "cinematic" : "orbit",
@@ -101,6 +117,10 @@ export const useApp = create<AppState>((set) => ({
   acknowledged: {},
 
   setTimeOverride: (timeOverride) => set({ timeOverride }),
+  setTimeMode: (mode) => {
+    savePref("timeMode", mode);
+    set({ timeOverride: presetTime(mode) });
+  },
   reportAssetError: (message) => set((st) => (st.assetErrors.includes(message) ? st : { assetErrors: [...st.assetErrors, message] })),
   markReady: (part) => set((st) => (st.readyParts.includes(part) ? st : { readyParts: [...st.readyParts, part] })),
 
@@ -116,13 +136,14 @@ export const useApp = create<AppState>((set) => ({
             config: msg.config,
             usage: msg.usage,
             sessions: Object.fromEntries(msg.sessions.map((s) => [s.id, s])),
+            twins: assignTwinNumbers(state.twins, msg.sessions),
           };
         case "sessions": {
           const sessions = { ...state.sessions };
           for (const s of msg.updated) sessions[s.id] = s;
           for (const id of msg.removed) delete sessions[id];
           const selectedId = state.selectedId && sessions[state.selectedId] ? state.selectedId : null;
-          return { clockOffset, sessions, selectedId };
+          return { clockOffset, sessions, selectedId, twins: assignTwinNumbers(state.twins, Object.values(sessions)) };
         }
         case "cues": {
           let seq = state.cueSeq;

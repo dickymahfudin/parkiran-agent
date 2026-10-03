@@ -222,6 +222,7 @@ describe("compaction (kopi run)", () => {
     const after = run([ev("PostCompact", 4, { compactTrigger: "auto" })], world);
     expect(session(after.world).phase).toBe("working");
     expect(kinds([...cues, ...after.cues])).toContain("compactDone");
+    expect(session(after.world).compactions).toBe(1);
   });
 
   test("idle → compacting → idle", () => {
@@ -362,5 +363,67 @@ describe("timers (tick)", () => {
   test("tick returns the same object when nothing changes", () => {
     const { world } = run([ev("PreToolUse", 0, { toolName: "Bash", toolUseId: "t" })]);
     expect(tick(world, 1000, cfg).world).toBe(world);
+  });
+});
+
+describe("insights (timeline, tool mix, waiting, milestones)", () => {
+  const M = 60_000;
+  const tool = (name: string, at: number, id: string): IngestEvent[] => [ev("PreToolUse", at, { toolName: name, toolUseId: id }), ev("PostToolUse", at + 1, { toolName: name, toolUseId: id })];
+
+  test("the timeline records state changes only, thinking and tool calls both count as work", () => {
+    const { world } = run([
+      ev("SessionStart", 0),
+      ev("UserPromptSubmit", 1 * M),
+      ...tool("Read", 2 * M, "t1"),
+      ...tool("Bash", 3 * M, "t2"),
+      ev("Stop", 10 * M),
+    ]);
+    expect(session(world).timeline).toEqual([
+      { state: "idle", at: 0 },
+      { state: "working", at: 1 * M },
+      { state: "idle", at: 10 * M },
+    ]);
+    expect(session(world).workedMs).toBe(9 * M);
+  });
+
+  test("tool mix by group (MCP on its own), asks and the time spent waiting for the user", () => {
+    const { world } = run([
+      ev("UserPromptSubmit", 0),
+      ...tool("Read", 1000, "t1"),
+      ...tool("mcp__Claude_Browser__navigate", 2000, "t2"),
+      ev("PreToolUse", 3000, { toolName: "Bash", toolUseId: "t3" }),
+      ev("PermissionRequest", 3100, { toolName: "Bash" }),
+      ev("PostToolUse", 63_100, { toolName: "Bash", toolUseId: "t3" }),
+    ]);
+    const s = session(world);
+    expect(s.toolMix).toEqual({ read: 1, mcp: 1, bash: 1 });
+    expect(s.asks).toBe(1);
+    expect(s.waitedMs).toBe(60_000);
+    expect(s.timeline.map((e) => e.state)).toEqual(["working", "waiting", "working"]);
+  });
+
+  test("the timeline keeps about the last hour", () => {
+    const events: IngestEvent[] = [];
+    for (let i = 0; i < 40; i++) events.push(ev("UserPromptSubmit", i * 5 * M), ev("Stop", i * 5 * M + M));
+    const t = session(run(events).world).timeline;
+    expect(t[1]!.at).toBeGreaterThan(39 * 5 * M + M - 60 * M);
+    expect(t[0]!.at).toBeLessThanOrEqual(39 * 5 * M + M - 60 * M);
+  });
+
+  test("milestones are announced once: tool calls, compactions, and hours of work (with time, from tick)", () => {
+    const events: IngestEvent[] = [ev("UserPromptSubmit", 0)];
+    for (let i = 0; i < 101; i++) events.push(...tool("Read", 10 + i * 10, `c${i}`));
+    events.push(ev("PreCompact", 5000), ev("PostCompact", 6000), ev("PreCompact", 7000), ev("PostCompact", 8000));
+    const { world, cues } = run(events);
+    const milestones = cues.filter((c) => c.kind === "milestone");
+    expect(milestones).toEqual([
+      { kind: "milestone", sessionId: S, milestone: "calls", value: 100 },
+      { kind: "milestone", sessionId: S, milestone: "compactions", value: 2 },
+    ]);
+    // The two kopi runs (2 s) are not work.
+    expect(tick(world, 60 * M, cfg).cues).toEqual([]);
+    const hour = tick(world, 60 * M + 2000, cfg);
+    expect(hour.cues).toEqual([{ kind: "milestone", sessionId: S, milestone: "work", value: 1 }]);
+    expect(tick(hour.world, 60 * M + 5000, cfg).cues).toEqual([]);
   });
 });

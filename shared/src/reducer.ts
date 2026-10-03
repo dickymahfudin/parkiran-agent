@@ -5,15 +5,23 @@ import {
   type Cue,
   type Need,
   type NeedKind,
+  type Milestone,
   type ReducerConfig,
   type Session,
+  type TimelineState,
   type World,
 } from "./session.ts";
-import { QUESTION_TOOLS, workKindOf } from "./tools.ts";
+import { QUESTION_TOOLS, toolGroupOf, workKindOf } from "./tools.ts";
 
 const MAX_DONE_TOOLS = 64;
 const MAX_OPEN_TOOLS = 64;
 const OPEN_TOOL_TTL_MS = 60 * 60_000;
+/** How much history the timeline keeps, and at most how many entries. */
+export const TIMELINE_WINDOW_MS = 60 * 60_000;
+const MAX_TIMELINE = 120;
+/** Announced once each per session. */
+export const MILESTONES: Record<Milestone, readonly number[]> = { calls: [100, 250, 500, 1000], work: [1, 2, 4], compactions: [2, 4] };
+const HOUR_MS = 60 * 60_000;
 
 export interface ReduceResult {
   world: World;
@@ -36,7 +44,51 @@ function cloneSession(s: Session): Session {
     subagents: Object.fromEntries(Object.entries(s.subagents).map(([k, v]) => [k, { ...v }])),
     openTools: { ...s.openTools },
     doneTools: [...s.doneTools],
+    toolMix: { ...s.toolMix },
+    timeline: [...s.timeline],
+    milestones: [...s.milestones],
   };
+}
+
+function timelineState(s: Session): TimelineState | null {
+  if (s.phase === "leaving") return null;
+  if (s.need) return "waiting";
+  if (s.phase === "compacting") return "compacting";
+  return s.phase === "working" ? "working" : "idle";
+}
+
+/** Time spent working so far, the current stretch included. */
+export function workedMs(s: Pick<Session, "timeline" | "workedMs">, now: number): number {
+  const last = s.timeline[s.timeline.length - 1];
+  return s.workedMs + (last?.state === "working" ? Math.max(0, now - last.at) : 0);
+}
+
+/** Appends a timeline entry when the session's state changed, and keeps the timeline to about the last hour. */
+function recordState(s: Session, at: number): void {
+  const state = timelineState(s);
+  const last = s.timeline[s.timeline.length - 1];
+  if (state === null || last?.state === state) return;
+  const t = Math.max(at, last?.at ?? at);
+  if (last?.state === "working") s.workedMs += t - last.at;
+  s.timeline.push({ state, at: t });
+  // Keep the entry the window starts in, drop the ones before it.
+  let drop = 0;
+  while (drop < s.timeline.length - 1 && s.timeline[drop + 1]!.at <= t - TIMELINE_WINDOW_MS) drop++;
+  drop = Math.max(drop, s.timeline.length - MAX_TIMELINE);
+  if (drop > 0) s.timeline.splice(0, drop);
+}
+
+/** Announces each milestone the session has reached and not announced yet. */
+function reachMilestones(s: Session, cues: Cue[], now: number): void {
+  const reached: Record<Milestone, number> = { calls: s.toolCalls, work: workedMs(s, now) / HOUR_MS, compactions: s.compactions };
+  for (const [milestone, steps] of Object.entries(MILESTONES) as [Milestone, readonly number[]][]) {
+    for (const value of steps) {
+      const key = `${milestone}:${value}`;
+      if (reached[milestone] < value || s.milestones.includes(key)) continue;
+      s.milestones.push(key);
+      cues.push({ kind: "milestone", sessionId: s.id, milestone, value });
+    }
+  }
 }
 
 function createSession(ev: IngestEvent, world: World): Session {
@@ -55,6 +107,13 @@ function createSession(ev: IngestEvent, world: World): Session {
     dozing: false,
     toolCalls: 0,
     failures: 0,
+    compactions: 0,
+    toolMix: {},
+    asks: 0,
+    waitedMs: 0,
+    timeline: [],
+    workedMs: 0,
+    milestones: [],
     startedAt: ev.ts,
     lastEventAt: ev.ts,
     lastEvent: ev.event,
@@ -104,6 +163,7 @@ export function reduce(world: World, ev: IngestEvent, config: ReducerConfig = DE
   const startNeed = (kind: NeedKind, toolName: string | null, toolUseId: string | null): void => {
     if (s.need !== null) return;
     s.need = { kind, toolName, toolUseId, agentId: ev.agentId ?? null, since: ev.ts, reminded: false };
+    s.asks += 1;
     cues.push({ kind: "needStarted", sessionId: id, need: kind });
     setPhase(() => {
       s.phase = "waiting";
@@ -113,6 +173,7 @@ export function reduce(world: World, ev: IngestEvent, config: ReducerConfig = DE
     const need = s.need;
     if (need === null) return;
     s.need = null;
+    s.waitedMs += Math.max(0, ev.ts - need.since);
     s.lastOutcome = { kind: outcome, at: ev.ts };
     if (outcome === "denied" && need.toolUseId) delete s.openTools[need.toolUseId];
     cues.push({ kind: "needResolved", sessionId: id, outcome });
@@ -194,6 +255,8 @@ export function reduce(world: World, ev: IngestEvent, config: ReducerConfig = DE
         }
       }
       s.toolCalls++;
+      const group = toolGroupOf(ev.toolName);
+      s.toolMix[group] = (s.toolMix[group] ?? 0) + 1;
       if (failed) s.failures++;
       if (s.need && needMatches(s.need, ev.toolUseId, ev.toolName)) {
         resolveNeed(s.need.kind === "permission" ? "approved" : "answered");
@@ -318,6 +381,7 @@ export function reduce(world: World, ev: IngestEvent, config: ReducerConfig = DE
         s.phase = s.resumePhase === "waiting" && s.need === null ? "working" : (s.resumePhase ?? "idle");
         s.resumePhase = null;
         s.lastStateTs = Math.max(s.lastStateTs, ev.ts);
+        s.compactions += 1;
         cues.push({ kind: "compactDone", sessionId: id });
       }
       break;
@@ -333,6 +397,8 @@ export function reduce(world: World, ev: IngestEvent, config: ReducerConfig = DE
       break;
   }
 
+  recordState(s, ev.ts);
+  reachMilestones(s, cues, ev.ts);
   return { world: next, cues };
 }
 
@@ -392,6 +458,12 @@ export function tick(world: World, now: number, config: ReducerConfig = DEFAULT_
     }
     for (const [toolId, t] of Object.entries(s.openTools)) {
       if (now - t.startedAt >= OPEN_TOOL_TTL_MS) delete edit().openTools[toolId];
+    }
+    // Work milestones come with time, not with an event.
+    const last = s.timeline[s.timeline.length - 1];
+    if (last?.state === "working") {
+      const next = MILESTONES.work.find((h) => !s.milestones.includes(`work:${h}`));
+      if (next !== undefined && workedMs(s, now) >= next * HOUR_MS) reachMilestones(edit(), cues, now);
     }
     sessions[id] = s;
   }

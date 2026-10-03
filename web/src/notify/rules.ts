@@ -12,8 +12,9 @@ const TITLE: Record<NonNullable<PublicSession["need"]>["kind"], string> = {
   input: "needs input",
 };
 
-export function notificationTitle(s: PublicSession): string {
-  return `${s.project ?? "Claude Code"} ${s.need ? TITLE[s.need.kind] : ""}`.trim();
+/** `name`: the session's display name (twins carry `#2`), else its project. */
+export function notificationTitle(s: PublicSession, name = s.project ?? "Claude Code"): string {
+  return `${name} ${s.need ? TITLE[s.need.kind] : ""}`.trim();
 }
 
 /** Pure scheduling rule, unit tested: should this session chime now? */

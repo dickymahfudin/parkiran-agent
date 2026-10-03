@@ -1,10 +1,26 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { PublicSession } from "../../../shared/src/protocol.ts";
 import { requestNotificationPermission } from "../notify/notifier.ts";
 import { lookFor } from "../scene/characters/identity.ts";
+import { TIME_PRESETS, modeOf, type TimeMode } from "../scene/env/timeOfDay.ts";
 import { SCENE_PARTS, serverNow, useApp } from "../state/store.ts";
 import { Icon, ParkingMark } from "./icons.tsx";
-import { MOOD_COLOR, MOOD_NAME, NEED_ICON, cueLine, type StateLabel, formatAge, formatDuration, moodCounts, shortId, stateLabel } from "./labels.ts";
+import { GROUP_COLOR, TIMELINE_COLOR, TIMELINE_LABEL, formatSpan, timelineSegments, timelineTotals, toolMixRows, waitedTotal } from "./insights.ts";
+import {
+  MOOD_COLOR,
+  MOOD_NAME,
+  NEED_ICON,
+  cueLine,
+  type IconName,
+  type StateLabel,
+  formatAge,
+  formatDuration,
+  formatToolName,
+  moodCounts,
+  sessionName,
+  shortId,
+  stateLabel,
+} from "./labels.ts";
 
 function useNow(intervalMs: number): number {
   const [now, setNow] = useState(serverNow);
@@ -48,18 +64,23 @@ function StateChip({ label }: { label: StateLabel }) {
 
 function SessionRow({ s, now, selected, onSelect }: { s: PublicSession; now: number; selected: boolean; onSelect(): void }) {
   const label = stateLabel(s, now);
+  const twins = useApp((st) => st.twins);
   const friends = Object.keys(s.subagents).length;
   const tool = s.currentTool ?? s.lastTool;
   return (
     <button type="button" className={`session-row mood-${label.mood}${selected ? " selected" : ""}`} onClick={onSelect} aria-pressed={selected}>
       <Avatar s={s} />
       <span className="session-main">
-        <span className="project">{s.project ?? "?"}</span>
+        <span className="project">{sessionName(s, twins)}</span>
         {s.branch && <span className="branch">{s.branch}</span>}
       </span>
       <StateChip label={label} />
       <span className="session-meta">
-        {tool && <span className="tool">{tool}</span>}
+        {tool && (
+          <span className="tool" title={tool}>
+            {formatToolName(tool)}
+          </span>
+        )}
         <span>{s.toolCalls} calls</span>
         {friends > 0 && <span>+{friends} subagent</span>}
         <span>{formatAge(now - s.lastEventAt)}</span>
@@ -95,13 +116,16 @@ function EmptyLot() {
 
 function Detail({ s, now, onClose }: { s: PublicSession; now: number; onClose(): void }) {
   const label = stateLabel(s, now);
+  const twins = useApp((st) => st.twins);
   const rows: [string, string][] = [
     ["Branch", s.branch ?? "–"],
-    ["Tool", s.currentTool ? `${s.currentTool} (running)` : (s.lastTool ?? "–")],
+    ["Tool", s.currentTool ? `${formatToolName(s.currentTool)} (running)` : s.lastTool ? formatToolName(s.lastTool) : "–"],
     ["Tool calls", String(s.toolCalls)],
     ["Session duration", formatDuration(now - s.startedAt)],
     ["Last event", `${s.lastEvent} · ${formatAge(now - s.lastEventAt)}`],
     ["Subagents", String(Object.keys(s.subagents).length)],
+    ["Asked you", `${s.asks}×`],
+    ["Waited for you", formatSpan(waitedTotal(s, now))],
     ["Session ID", shortId(s.id)],
   ];
   return (
@@ -109,7 +133,7 @@ function Detail({ s, now, onClose }: { s: PublicSession; now: number; onClose():
       <header>
         <Avatar s={s} />
         <div className="detail-heading">
-          <h2 className="detail-title">{s.project ?? "?"}</h2>
+          <h2 className="detail-title">{sessionName(s, twins)}</h2>
           <StateChip label={label} />
         </div>
         <button type="button" className="icon-button" onClick={onClose} aria-label="Close" title="Close (Esc)">
@@ -124,7 +148,59 @@ function Detail({ s, now, onClose }: { s: PublicSession; now: number; onClose():
           </div>
         ))}
       </dl>
+      <Insights s={s} now={now} />
     </section>
+  );
+}
+
+/** The session's last hour as a strip, and its tool mix. Colours always come with a label. */
+function Insights({ s, now }: { s: PublicSession; now: number }) {
+  const segments = timelineSegments(s.timeline, now);
+  const totals = timelineTotals(segments);
+  const mix = toolMixRows(s.toolMix);
+  return (
+    <div className="insights">
+      <h3>Last hour</h3>
+      <div className="timeline" role="img" aria-label={totals.map((t) => `${TIMELINE_LABEL[t.state]} ${formatSpan(t.ms)}`).join(", ") || "No activity yet"}>
+        {segments.map((g) => (
+          <span
+            key={g.start}
+            style={{ left: `${g.start * 100}%`, width: `${g.width * 100}%`, background: TIMELINE_COLOR[g.state] }}
+            title={`${TIMELINE_LABEL[g.state]} · ${formatSpan(g.ms)}`}
+          />
+        ))}
+      </div>
+      <div className="timeline-axis" aria-hidden="true">
+        <span>1 h ago</span>
+        <span>now</span>
+      </div>
+      <ul className="legend">
+        {totals.map((t) => (
+          <li key={t.state}>
+            <i style={{ background: TIMELINE_COLOR[t.state] }} />
+            {TIMELINE_LABEL[t.state]} <b>{formatSpan(t.ms)}</b>
+          </li>
+        ))}
+      </ul>
+      {mix.length > 0 && (
+        <>
+          <h3>Tool mix</h3>
+          <div className="mix-bar" aria-hidden="true">
+            {mix.map((r) => (
+              <span key={r.group} style={{ flexGrow: r.count, background: GROUP_COLOR[r.group] }} />
+            ))}
+          </div>
+          <ul className="legend">
+            {mix.map((r) => (
+              <li key={r.group}>
+                <i style={{ background: GROUP_COLOR[r.group] }} />
+                {r.label} <b>{r.count}</b>
+              </li>
+            ))}
+          </ul>
+        </>
+      )}
+    </div>
   );
 }
 
@@ -132,6 +208,7 @@ function Detail({ s, now, onClose }: { s: PublicSession; now: number; onClose():
 function Attention({ list, now }: { list: PublicSession[]; now: number }) {
   const acknowledged = useApp((st) => st.acknowledged);
   const select = useApp((st) => st.select);
+  const twins = useApp((st) => st.twins);
   const waiting = list.filter((s) => s.need).sort((a, b) => a.need!.since - b.need!.since);
   if (waiting.length === 0) return null;
   return (
@@ -145,8 +222,8 @@ function Attention({ list, now }: { list: PublicSession[]; now: number }) {
               <Icon name={NEED_ICON[need.kind]} />
             </span>
             <span>
-              <b>{s.project ?? "Claude Code"}</b> {NEED_PHRASE[need.kind]}
-              {need.toolName && need.kind === "permission" && <span className="attention-tool"> · {need.toolName}</span>}
+              <b>{s.project ? sessionName(s, twins) : "Claude Code"}</b> {NEED_PHRASE[need.kind]}
+              {need.toolName && need.kind === "permission" && <span className="attention-tool"> · {formatToolName(need.toolName)}</span>}
             </span>
             <span className="attention-age">{formatAge(now - need.since)}</span>
           </button>
@@ -159,17 +236,69 @@ function Attention({ list, now }: { list: PublicSession[]; now: number }) {
 
 const DAY_FROM_H = 6;
 const NIGHT_FROM_H = 18;
+const MODE_ICON: Record<TimeMode, IconName> = { auto: "auto", pagi: "morning", siang: "day", sore: "evening", malam: "night" };
+const TIME_OPTIONS: readonly { mode: TimeMode; label: string; hint: string }[] = [
+  { mode: "auto", label: "Auto", hint: "follows your clock" },
+  ...TIME_PRESETS.map((p) => ({ mode: p.mode, label: p.label, hint: p.time })),
+];
 
-/** The time the lot is lit for (the scene follows the local clock), with a sun or a moon. */
-function SceneClock({ override }: { override: string | null }) {
+/**
+ * The time the lot is lit for, and the time-of-day menu: Auto follows the local clock, Pagi / Siang / Sore / Malam hold
+ * the lot at that time. The choice is remembered in this browser.
+ */
+function TimeControl({ override }: { override: string | null }) {
+  const [open, setOpen] = useState(false);
+  const root = useRef<HTMLDivElement>(null);
+  const mode = modeOf(override);
   const d = new Date(serverNow());
   const [h, m] = override ? override.split(":").map(Number) : [d.getHours(), d.getMinutes()];
   const day = h! >= DAY_FROM_H && h! < NIGHT_FROM_H;
+  const current = TIME_OPTIONS.find((o) => o.mode === mode);
+  useEffect(() => {
+    if (!open) return;
+    const away = (e: PointerEvent) => !root.current?.contains(e.target as Node) && setOpen(false);
+    window.addEventListener("pointerdown", away);
+    return () => window.removeEventListener("pointerdown", away);
+  }, [open]);
+  const pick = (next: TimeMode) => {
+    useApp.getState().setTimeMode(next);
+    setOpen(false);
+  };
   return (
-    <span className="scene-clock" title="Scene time (follows your clock)">
-      <Icon name={day ? "day" : "night"} />
-      {String(h).padStart(2, "0")}:{String(m).padStart(2, "0")}
-    </span>
+    <div
+      className="time-control"
+      ref={root}
+      onKeyDown={(e) => {
+        if (e.key === "Escape" && open) {
+          e.stopPropagation();
+          setOpen(false);
+        }
+      }}
+    >
+      <button
+        type="button"
+        className="scene-clock"
+        aria-haspopup="menu"
+        aria-expanded={open}
+        onClick={() => setOpen(!open)}
+        title={mode === "auto" ? "Scene time follows your clock. Click for Pagi, Siang, Sore or Malam" : "Scene time is fixed. Click to change"}
+      >
+        <Icon name={mode && mode !== "auto" ? MODE_ICON[mode] : day ? "day" : "night"} />
+        {String(h).padStart(2, "0")}:{String(m).padStart(2, "0")}
+        <span className="time-mode">{current?.label ?? "Custom"}</span>
+      </button>
+      {open && (
+        <div className="time-menu panel" role="menu" aria-label="Time of day">
+          {TIME_OPTIONS.map((o) => (
+            <button key={o.mode} type="button" role="menuitemradio" aria-checked={mode === o.mode} onClick={() => pick(o.mode)}>
+              <Icon name={MODE_ICON[o.mode]} />
+              <span className="time-option">{o.label}</span>
+              <span className="time-hint">{o.hint}</span>
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -189,7 +318,7 @@ function Toolbar() {
           <button type="button" aria-pressed={cameraMode === "orbit"} onClick={() => set.setCameraMode("orbit")} title="Drag to orbit, scroll to zoom">
             Orbit
           </button>
-          <button type="button" aria-pressed={cameraMode === "cinematic"} onClick={() => set.setCameraMode("cinematic")} title="Slow automatic camera">
+          <button type="button" aria-pressed={cameraMode === "cinematic"} onClick={() => set.setCameraMode("cinematic")} title="Director: the camera goes where things happen">
             Cinematic
           </button>
         </div>
@@ -233,7 +362,7 @@ function Toolbar() {
       >
         <Icon name={notificationsEnabled && !notifyBlocked ? "bellOn" : "bellOff"} />
       </button>
-      {!import.meta.env.DEV && !compact && <SceneClock override={timeOverride} />}
+      {!compact && <TimeControl override={timeOverride} />}
       {import.meta.env.DEV && !compact && (
         <label className="time-override" title="Scene time override (dev)">
           <input type="time" value={timeOverride ?? ""} onChange={(e) => set.setTimeOverride(e.target.value || null)} />
@@ -254,6 +383,7 @@ const ATTENTION_MOODS = new Set(["needs", "trouble"]);
 function EventFeed({ now }: { now: number }) {
   const cueLog = useApp((st) => st.cueLog);
   const sessions = useApp((st) => st.sessions);
+  const twins = useApp((st) => st.twins);
   const [filter, setFilter] = useState<FeedFilter>("all");
   const lines = cueLog
     .map((e) => ({ e, line: cueLine(e.cue, sessions[e.cue.sessionId]) }))
@@ -281,7 +411,7 @@ function EventFeed({ now }: { now: number }) {
                 <Icon name={line.icon} />
               </span>
               <span className="cue-text">
-                <b>{sessions[e.cue.sessionId]?.project ?? shortId(e.cue.sessionId)}</b> {line.text}
+                <b>{sessions[e.cue.sessionId] ? sessionName(sessions[e.cue.sessionId]!, twins) : shortId(e.cue.sessionId)}</b> {line.text}
               </span>
               <span className="age">{formatAge(now - e.at)}</span>
             </li>

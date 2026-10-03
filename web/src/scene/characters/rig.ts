@@ -18,8 +18,14 @@ export interface ClipsJson {
   mouth: [number, number, number];
 }
 
-/** Either one full-body clip, or legs from one clip and everything above the hips from another. */
-export type RigPlay = { full: string } | { lower: string; upper: string };
+/**
+ * Either one full-body clip, or legs from one clip and everything above the hips from another; `upperAt` holds the
+ * upper half still at that clip time (a pose instead of a motion).
+ */
+export type RigPlay = { full: string } | { lower: string; upper: string; upperAt?: number };
+
+/** Into the reach of the Interact clip: both forearms forward at the height of a cart's handles. */
+const PUSH_POSE_S = 0.8;
 
 const SEATED: Partial<Record<Clip, string>> = {
   think: "think",
@@ -60,10 +66,12 @@ const ALWAYS: Partial<Record<Clip, string>> = {
 };
 
 export function rigPlay(clip: Clip, seated: boolean): RigPlay {
+  if (clip === "push") return { lower: "walk", upper: "interact", upperAt: PUSH_POSE_S };
   const name = (seated ? SEATED[clip] : STANDING[clip]) ?? ALWAYS[clip];
   if (!name) throw new Error(`no rig clip for ${clip}`);
-  // The stretch was keyed seated; a seatless character stretches from the waist up while standing.
+  // The stretch was keyed seated and the wave standing: the other posture plays it from the waist up.
   if (clip === "stretch" && !seated) return { lower: "standIdle", upper: "stretch" };
+  if (clip === "wave" && seated) return { lower: "sitIdle", upper: "wave" };
   return { full: name };
 }
 

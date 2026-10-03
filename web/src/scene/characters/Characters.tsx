@@ -3,11 +3,12 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import * as THREE from "three";
 import type { PublicSession } from "../../../../shared/src/protocol.ts";
 import { SEATS } from "../../../../shared/src/seats.ts";
-import { MOOD_COLOR, stateLabel } from "../../hud/labels.ts";
+import { MOOD_COLOR, sessionName, stateLabel } from "../../hud/labels.ts";
 import { serverNow, useApp } from "../../state/store.ts";
-import { SEAT_PLACES, WARUNG_STOOLS, assignStandingSpots, assignWarungStools, nearestStandingSpot, standingSpotFor, type StandingSpot } from "../layout.ts";
+import { SEAT_PLACES, WARUNG_STOOLS, assignStandingSpots, assignWarungStools, nearestStandingSpot, standingSpotFor, type StandingSpot, type Vec2 } from "../layout.ts";
 import { Brain, type Home, type Target } from "./brain.ts";
 import { hash32, lookFor, type Look } from "./identity.ts";
+import { PakJoko, warungCounter } from "./PakJoko.tsx";
 import { Person, type TagInfo } from "./Person.tsx";
 import { SmokeSystem, type SmokeSource } from "./props.tsx";
 
@@ -23,6 +24,13 @@ interface Entry {
 }
 
 const NEIGHBOURS = new Map(SEATS.map((s) => [s.id, s.neighbours]));
+/** Idle neighbours chat for `CHAT_WINDOW_S` out of every `CHAT_CYCLE_S`, each pair at its own offset. */
+const CHAT_CYCLE_S = 80;
+const CHAT_WINDOW_S = 14;
+/** Both have to have been idle this long first (the phone comes out before the talk). */
+const CHAT_AFTER_IDLE_MS = 15_000;
+/** Chat windows open and close with the clock, so the cast is re-synced at least this often. */
+const RESYNC_MS = 1000;
 
 function placeOf(seatId: string): Home {
   const seat = SEAT_PLACES[seatId];
@@ -72,9 +80,44 @@ function standingPlaces(sessions: readonly PublicSession[]): Map<string, Standin
 
 const friendKey = (sessionId: string, agentId: string): string => `${sessionId}/${agentId}`;
 
-function tagFor(s: PublicSession, now: number): TagInfo {
+function tagFor(s: PublicSession, now: number, twins: ReadonlyMap<string, number>): TagInfo {
   const label = stateLabel(s, now);
-  return { title: s.project ?? "?", subtitle: s.branch, color: MOOD_COLOR[label.mood], text: label.text, icon: label.icon };
+  return { title: sessionName(s, twins), subtitle: s.branch, color: MOOD_COLOR[label.mood], text: label.text, icon: label.icon };
+}
+
+const idleAt = (e: Entry, now: number): boolean => {
+  const t = e.brain.state.target;
+  return t?.kind === "seated" && t.activity === "idle" && e.brain.state.posture === "seated" && now - e.brain.changedAt >= CHAT_AFTER_IDLE_MS;
+};
+
+/**
+ * Pairs of seated, idle neighbours whose chat window is open right now (seat order, each person in one pair at most).
+ * The window is a pure function of the clock and the pair, so both sides start and stop together.
+ */
+function chatPairs(bySeat: ReadonlyMap<string, Entry>, now: number): Map<string, Vec2> {
+  const talking = new Map<string, Vec2>();
+  for (const seat of SEATS) {
+    const a = bySeat.get(seat.id);
+    if (!a || talking.has(a.key) || !idleAt(a, now)) continue;
+    for (const n of seat.neighbours) {
+      const b = bySeat.get(n);
+      if (!b || talking.has(b.key) || !idleAt(b, now)) continue;
+      const offset = hash32([a.key, b.key].sort().join("|")) % CHAT_CYCLE_S;
+      if ((now / 1000 + offset) % CHAT_CYCLE_S >= CHAT_WINDOW_S) break;
+      talking.set(a.key, SEAT_PLACES[n]!.approach);
+      talking.set(b.key, SEAT_PLACES[seat.id]!.approach);
+      break;
+    }
+  }
+  return talking;
+}
+
+/** Someone just sat down next to others: they wave at each other. */
+function greet(arrived: Entry, bySeat: ReadonlyMap<string, Entry>): void {
+  const near = (NEIGHBOURS.get(arrived.homeKey) ?? []).map((n) => bySeat.get(n)).filter((e): e is Entry => e !== undefined && e.brain.state.posture === "seated");
+  if (near.length === 0) return;
+  arrived.brain.react("wave");
+  for (const e of near) e.brain.react("wave");
 }
 
 const DECLUTTER_EVERY = 3;
@@ -144,27 +187,46 @@ export function Characters() {
   const entries = useRef(new Map<string, Entry>());
   const [keys, setKeys] = useState<string[]>([]);
   const smokeSources = useMemo(() => new Map<string, SmokeSource>(), []);
+  const owner = useMemo(() => {
+    const smoke: SmokeSource = { active: false, world: new THREE.Vector3(), kind: "smoke" };
+    const steam: SmokeSource = { active: false, world: new THREE.Vector3(), kind: "steam" };
+    smokeSources.set("pak-joko:smoke", smoke);
+    smokeSources.set("pak-joko:steam", steam);
+    return { smoke, steam };
+  }, [smokeSources]);
   const initialIds = useRef<Set<string> | null>(null);
   const lastCueSeq = useRef(0);
-  const synced = useRef<{ sessions: unknown; cueSeq: number } | null>(null);
+  const synced = useRef<{ sessions: unknown; cueSeq: number; at: number } | null>(null);
   const visits = useRef(new Map<string, string>());
   const sessions = useApp((st) => st.sessions);
+  const twins = useApp((st) => st.twins);
   const select = useApp((st) => st.select);
 
   useFrame(() => {
     const st = useApp.getState();
     if (st.config === null) return;
     let changed = false;
+    const arrivals: Entry[] = [];
+    let buying = false;
     for (const [k, e] of entries.current) {
+      if (e.brain.takeArrival()) arrivals.push(e);
+      buying ||= e.brain.state.step === "buy";
       if (!e.brain.done) continue;
       entries.current.delete(k);
       smokeSources.delete(`${k}:smoke`);
       smokeSources.delete(`${k}:steam`);
       changed = true;
     }
-    // Targets only change with the sessions; everything below is skipped on frames where nothing came in.
-    if (!changed && synced.current?.sessions === st.sessions && synced.current.cueSeq === st.cueSeq) return;
-    synced.current = { sessions: st.sessions, cueSeq: st.cueSeq };
+    warungCounter.busy = buying;
+    const seated = (): Map<string, Entry> => new Map([...entries.current.values()].filter((e) => SEAT_PLACES[e.homeKey]).map((e) => [e.homeKey, e]));
+    if (arrivals.length > 0) {
+      const bySeat = seated();
+      for (const e of arrivals) greet(e, bySeat);
+    }
+    const wall = Date.now();
+    // Targets only change with the sessions (and chat windows with the clock); otherwise everything below is skipped.
+    if (!changed && synced.current?.sessions === st.sessions && synced.current.cueSeq === st.cueSeq && wall - synced.current.at < RESYNC_MS) return;
+    synced.current = { sessions: st.sessions, cueSeq: st.cueSeq, at: wall };
     initialIds.current ??= new Set(Object.keys(st.sessions));
     const now = serverNow();
     const wanted = new Set<string>();
@@ -172,7 +234,7 @@ export function Characters() {
     const ensure = (key: string, sessionId: string, agentId: string | null, home: { home: Home; key: string }, target: Target): Entry => {
       let e = entries.current.get(key);
       if (!e) {
-        const look = lookFor(agentId ?? sessionId);
+        const look = lookFor(agentId ?? sessionId, useApp.getState().sessions[sessionId]?.project ?? null);
         const atHome = initialIds.current!.has(sessionId) && (agentId === null || target.kind !== "gone");
         const smoke: SmokeSource = { active: false, world: new THREE.Vector3(), kind: "smoke" };
         const steam: SmokeSource = { active: false, world: new THREE.Vector3(), kind: "steam" };
@@ -205,10 +267,8 @@ export function Characters() {
       if (!wanted.has(e.key)) e.brain.setTarget({ kind: "gone" }, null, now);
       else if (SEAT_PLACES[e.homeKey]) occupied.set(e.homeKey, e.key);
     }
-    for (const e of entries.current.values()) {
-      const nb = NEIGHBOURS.get(e.homeKey) ?? [];
-      e.brain.setNeighbour(nb.some((n) => occupied.has(n)));
-    }
+    const talking = chatPairs(seated(), now);
+    for (const e of entries.current.values()) e.brain.setChat(talking.get(e.key) ?? null);
 
     const goers = [...entries.current.values()]
       .filter((e) => wanted.has(e.key) && e.brain.state.target?.kind === "warung")
@@ -224,6 +284,7 @@ export function Characters() {
     for (const c of fresh) {
       lastCueSeq.current = c.seq;
       if (c.cue.kind === "failure") entries.current.get(c.cue.sessionId)?.brain.react("failure");
+      else if (c.cue.kind === "turnDone") entries.current.get(c.cue.sessionId)?.brain.react("done");
     }
 
     if (changed) setKeys([...entries.current.keys()]);
@@ -240,7 +301,7 @@ export function Characters() {
         const tag: TagInfo | null = s
           ? e.agentId
             ? { title: sub?.type || "subagent", subtitle: null, color: "#c9d1d9", text: "helping", icon: null }
-            : tagFor(s, now)
+            : tagFor(s, now, twins)
           : null;
         return (
           <Person
@@ -256,6 +317,7 @@ export function Characters() {
           />
         );
       })}
+      <PakJoko smoke={owner.smoke} steam={owner.steam} />
       <SmokeSystem sources={smokeSources} />
       <TagDeclutter />
     </>

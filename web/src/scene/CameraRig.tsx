@@ -1,15 +1,18 @@
-// Camera modes: clamped free orbit, slow cinematic drift, focus on the selected character, fixed compact view.
+// Camera modes: clamped free orbit, the cinematic director (cuts to what is happening, drifts over the lot in between),
+// focus on the selected character, fixed compact view.
 import { OrbitControls } from "@react-three/drei";
 import { useFrame, useThree } from "@react-three/fiber";
 import { useEffect, useRef, type ComponentRef } from "react";
 import * as THREE from "three";
-import { useApp } from "../state/store.ts";
+import { serverNow, useApp } from "../state/store.ts";
 import { characterRoots } from "./characters/registry.ts";
+import { START, direct, type DirectorState, type Framing } from "./director.ts";
 import { timeControl } from "./timeControl.ts";
 
 type Vec3 = readonly [number, number, number];
 
-const LOT_CENTER = new THREE.Vector3(0.4, 0.5, -0.8);
+/** What the cinematic drift circles: the benches and the warung front. */
+const LOT_CENTER = new THREE.Vector3(0.2, 0.8, -2.6);
 const UP = new THREE.Vector3(0, 1, 0);
 const COMPACT = { position: new THREE.Vector3(-3.4, 9.6, 13.2), target: new THREE.Vector3(0.4, 0.3, -1.0) };
 const MIN_AZIMUTH = -1.1;
@@ -38,6 +41,13 @@ const FOCUS_HEIGHT = 1.0;
 const FOCUS_SIDE = 0.45;
 const FOCUS_LIFT = 0.9;
 
+/** Director shots: distance from the person, height over the focus point, and how far round from their front. */
+const FRAMING: Record<Framing, { distance: number; lift: number; front: number }> = {
+  close: { distance: 2.3, lift: 0.45, front: 0.7 },
+  medium: { distance: 4.2, lift: 1.3, front: 0.55 },
+  follow: { distance: 7.5, lift: 3.0, front: 0 },
+};
+
 /** Zoom per wheel pixel (log scale): a mouse notch (~100 px) is about 9 %, a slow two-finger swipe a gentle glide. */
 const ZOOM_PER_PIXEL = 0.0009;
 /** Trackpad pinches arrive as small wheel deltas with ctrlKey set. */
@@ -59,7 +69,9 @@ export function CameraRig({ position, target }: { position: Vec3; target: Vec3 }
   const mode = useApp((s) => s.cameraMode);
   const compact = useApp((s) => s.compact);
   const drift = useRef(0);
-  const tmp = useRef({ focus: new THREE.Vector3(), step: new THREE.Vector3(), desired: new THREE.Vector3(), q: new THREE.Quaternion() });
+  const tmp = useRef({ focus: new THREE.Vector3(), step: new THREE.Vector3(), desired: new THREE.Vector3(), q: new THREE.Quaternion(), side: new THREE.Vector3() });
+  const director = useRef<DirectorState>(START);
+  const directing = useRef(false);
   const zoomedFor = useRef<string | null>(null);
   const returning = useRef(false);
   const wasFocused = useRef(false);
@@ -182,13 +194,14 @@ export function CameraRig({ position, target }: { position: Vec3; target: Vec3 }
     const c = controls.current;
     if (!c) return;
     const dt = Math.min(timeControl.frameDt, 0.1);
-    const { focus, step, desired, q } = tmp.current;
+    const { focus, step, desired, q, side } = tmp.current;
     const st = useApp.getState();
     if (st.viewResets !== lastReset.current) {
       lastReset.current = st.viewResets;
       returning.current = true;
     }
     const selected = st.selectedId ? characterRoots.get(st.selectedId) : undefined;
+    if (st.cameraMode !== "cinematic") directing.current = false;
     // The lot overview is clamped to the street side; around a character or zoomed in close, any angle is fine.
     const close = camera.position.distanceTo(c.target) < CLOSE_RADIUS;
     const free = (Boolean(selected?.visible) || returning.current || close) && !st.compact;
@@ -262,11 +275,35 @@ export function CameraRig({ position, target }: { position: Vec3; target: Vec3 }
     } else if (st.cameraMode === "cinematic") {
       zoomedFor.current = null;
       wasFocused.current = false;
+      const now = serverNow();
+      // Switching to cinematic starts on the overview, with events that happened before left alone.
+      if (!directing.current) director.current = { ...START, since: now, seenSeq: st.cueLog[0]?.seq ?? 0 };
+      directing.current = true;
+      director.current = direct(director.current, st.sessions, st.cueLog, now, (id) => characterRoots.get(id)?.visible === true);
+      const shot = director.current.shot;
+      const who = shot.kind === "person" ? characterRoots.get(shot.sessionId) : undefined;
+      if (shot.kind === "person" && who?.visible) {
+        // Somewhere between the person's front and the overview's side of the lot: always in the open, never behind a
+        // wall; a walker is followed from the overview's side so the shot does not swing round with every turn.
+        const f = FRAMING[shot.framing];
+        who.getWorldPosition(focus);
+        focus.y += FOCUS_HEIGHT;
+        who.getWorldQuaternion(q);
+        side.set(0, 0, 1).applyQuaternion(q).setY(0).normalize();
+        desired.subVectors(home.current.position, focus).setY(0).normalize();
+        side.lerp(desired, 1 - f.front).normalize();
+        desired.copy(focus).addScaledVector(side, f.distance);
+        desired.y = focus.y + f.lift;
+        c.target.lerp(focus, ease(2.2, dt));
+        camera.position.lerp(desired, ease(1.3, dt));
+        c.update();
+        return;
+      }
       drift.current += dt;
       const t = drift.current;
       const az = -0.25 + Math.sin(t * 0.035) * 0.55;
-      const radius = 15 + Math.sin(t * 0.027) * 2.2;
-      desired.set(LOT_CENTER.x + Math.sin(az) * radius, 6.2 + Math.sin(t * 0.043) * 1.2, LOT_CENTER.z + Math.cos(az) * radius);
+      const radius = 13 + Math.sin(t * 0.027) * 1.8;
+      desired.set(LOT_CENTER.x + Math.sin(az) * radius, 5.8 + Math.sin(t * 0.043) * 1.0, LOT_CENTER.z + Math.cos(az) * radius);
       camera.position.lerp(desired, ease(0.6, dt));
       c.target.lerp(LOT_CENTER, ease(0.6, dt));
     } else {

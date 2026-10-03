@@ -6,7 +6,17 @@ import { beginFrame, timeControl } from "./timeControl.ts";
 
 declare global {
   interface Window {
-    __parkiran?: { render(width?: number, height?: number): void; manual(on: boolean): void; step(seconds: number): void; store: typeof useApp; scene: THREE.Scene; camera: THREE.Camera; gl: THREE.WebGLRenderer };
+    __parkiran?: {
+      render(width?: number, height?: number): void;
+      manual(on: boolean): void;
+      step(seconds: number): void;
+      /** Puts the camera at `position` looking at `target` (the orbit pivot), like `?cam=` without a reload. */
+      view(position: [number, number, number], target: [number, number, number]): void;
+      store: typeof useApp;
+      scene: THREE.Scene;
+      camera: THREE.Camera;
+      gl: THREE.WebGLRenderer;
+    };
   }
 }
 
@@ -23,6 +33,7 @@ export function DebugHandle() {
   const scene = useThree((s) => s.scene);
   const camera = useThree((s) => s.camera);
   const gl = useThree((s) => s.gl);
+  const controls = useThree((s) => s.controls) as unknown as { target: THREE.Vector3; update(): void } | null;
   useEffect(() => {
     if (!import.meta.env.DEV) return;
     const render = (width = window.innerWidth, height = window.innerHeight) => {
@@ -38,13 +49,19 @@ export function DebugHandle() {
         timeControl.pending += seconds;
         render();
       },
+      view: (position, target) => {
+        camera.position.set(...position);
+        controls?.target.set(...target);
+        controls?.update();
+        render();
+      },
       store: useApp,
       scene,
       camera,
       gl,
     };
     return () => void delete window.__parkiran;
-  }, [advance, setSize, scene, camera, gl]);
+  }, [advance, setSize, scene, camera, gl, controls]);
   return null;
 }
 

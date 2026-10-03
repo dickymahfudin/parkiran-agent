@@ -40,10 +40,11 @@ Homebrew), run `bun run install-hooks` again.
 ### Development
 
 ```bash
-bun run server               # API + WebSocket on 127.0.0.1:4747
+bun run server               # API + WebSocket on 127.0.0.1:4747 (server:dev restarts on changes)
 bun run web                  # Vite dev server on http://127.0.0.1:4748 (hot reload)
 bun run simulate -- --list   # scripted sessions, no Claude needed
 bun run simulate -- --scenario=tour
+bun scripts/watch.ts --seconds=120   # prints live state changes and the HUD states seen
 bun test && bun run typecheck
 ```
 
@@ -64,19 +65,30 @@ unless you pass `--allow-reformat`. Both scripts accept `--dry-run` and `--setti
 
 | Session | Character |
 |---|---|
-| Session starts | walks in from the street along the gang, straight to a bench, stool or car hood, opens the laptop |
+| Session starts | walks in from the street along the gang, straight to a bench, stool or car hood, opens the laptop; waves at whoever sits next to it (they wave back) |
 | `thinking` | types with one hand, smokes with the other; when the tools start, the cigarette goes to the lips |
 | Working (`reading`, `bash`, `editing`, `browsing`, `subagent`) | types; slower for reading, faster for Bash |
 | Needs permission (`permission`) | stands up with an unlit cigarette, pats pockets, looks around; lighter bubble |
 | Permission approved | gets a light, first drag, sits back down |
 | Permission denied (inferred, Claude sends no event) | sighs, pockets the cigarette, sits back down |
 | Question / input (`question`, `needs input`) | stands up with a "?" bubble |
-| `idle` | shuts the laptop, lights a cigarette and scrolls the phone, with the odd drag |
+| Turn done | leans back for a stretch, a check badge pops up over the head, a soft "ting" |
+| `idle` | shuts the laptop, lights a cigarette and scrolls the phone, with the odd drag; two idle neighbours now and then turn to each other for a chat |
 | Tool or turn failure (`error`) | facepalm, then back to work |
 | `compacting` | buys a kopi at the warung window, drinks it on a free warung stool (or back on its own seat), walks back when done |
 | Subagent | a friend walks in and sits next to the parent (or on any free seat), leaves when done |
 | Idle for 30 min (`dozing`) | laptop shut, dozes off, Zzz |
 | Session ends (`leaving`) | stubs out the cigarette, closes the laptop, walks away |
+
+Everyone working on the same project wears the same thing, a black peci or glasses, so a repo's sessions (and their
+subagent friends) read as one crew. By each seat a tin ashtray fills up with butts as the session ages (one per 15
+minutes) and an empty kopi glass stays behind after every compaction, so you can tell an old session from a new one
+without the HUD.
+
+**Pak Joko** keeps the warung: behind his counter he smokes, sips, scrolls his phone and looks around, hands the kopi
+over when someone comes to buy, and naps on his stool from 23:00 to 04:30. In the evening a bakso or nasi goreng cart
+is pushed past on the far pavement now and then (at most one every 10 minutes, until 01:00), with its "ting-ting" or
+"tek-tek".
 
 When every seat is taken, newcomers and friends stand at their own spot (clear of the sitters, the cars and the
 walking lanes, never inside each other) and sit down as soon as a seat frees up.
@@ -87,9 +99,11 @@ The warung's side wall carries a spray-painted "NGOPI dulu!" piece with a kopi c
 writer's "dism" tag (drawn in code, weathered into the plaster, with the cans left at its foot) under a tin-shade lamp that lights it at night; warm festoon bulbs hang from the awning
 over the benches and red-white bunting runs along the back wall.
 
-**Camera:** drag to orbit, scroll to zoom towards whatever is under the mouse, right up to a person's face (scrolling
+**Camera:** the default view is framed on the benches, the gerobak and the warung. Drag to orbit, scroll to zoom towards whatever is under the mouse, right up to a person's face (scrolling
 back out returns to the overview), click a character to follow it. **Reset view** in the toolbar, the `R` key or a double-click on empty ground brings back the
-default angle.
+default angle. **Cinematic** is a director: it goes where things happen (a close-up of whoever needs you, a medium shot
+of a finished turn or a failure, following a newcomer or a coffee run), holds every shot at least 6 s, and drifts over
+the lot in between, now and then visiting someone at work.
 
 **Street:** cars and ojek share each lane single file and keep a safe gap to whoever is ahead.
 
@@ -99,13 +113,19 @@ appear. About 570 draw calls and 650k triangles a frame with six people in the l
 
 **Sound:** procedural, no audio files: distant traffic, engines of the cars and ojek going by (panned and louder as they
 pass the camera), laptop keyboards while sessions work (louder when you zoom in), birds in the morning, crickets at
-night, the lighter, and the chime.
+night, the lighter, a soft "ting" when a turn is done, the food carts' calls, and the chime.
+
+**Time of day:** the scene clock in the toolbar is also a menu: **Auto** follows your clock, **Pagi** (07:00), **Siang**
+(12:00), **Sore** (17:30) and **Malam** (21:00) hold the lot at that time. Switching eases the sun round the clock in
+1.5 s; the choice is remembered in this browser (`?time=` still wins).
 
 **HUD:** the session list shows each character's shirt colour next to the project, a summary of how many sessions
-need you, work or idle, and the tool and age of every session (click a row or a character for details; the camera
+need you, work or idle, and the tool and age of every session (MCP tools read as "Claude Browser › javascript_tool";
+sessions of the same project and branch are told apart as `#2`, `#3`). Click a row or a character for details (state,
+tool, calls, how often it asked you and how long it waited for you, its last hour as a strip, and its tool mix); the camera
 follows it, `Esc` lets go). Sessions waiting on you also appear as a banner at the top until they are handled; the event
-feed has an "All / Needs you" filter. The toolbar has free / cinematic camera, reset view, compact mode for a second
-monitor, sound, notifications and the scene clock (a clock override in dev mode). A loading screen covers the lot until
+feed has an "All / Needs you" filter and marks milestones (100 tool calls, 1 h of work, the 2nd compaction). The toolbar has free / cinematic camera, reset view, compact mode for a second
+monitor, sound, notifications and the time of day (plus a free time input in dev mode). A loading screen covers the lot until
 every part of the scene has arrived. States and events use stroke icons (Lucide), no emoji. Plain facts read in English; the warung jokes stay ("cari korek", "batal
 ngerokok", "bawa kopi").
 
@@ -113,7 +133,8 @@ ngerokok", "bawa kopi").
 also get a system notification such as "warung-app needs permission" with the branch. Clicking the character silences
 it; it never changes the real session. Sound starts after your first click on the page (browser rule).
 
-URL options: `?time=21:00` (fixed scene time), `?compact`, `?cinematic`, `?stats` (frame-rate meter).
+URL options: `?time=21:00` (fixed scene time), `?compact`, `?cinematic`, `?stats` (frame-rate meter); in dev mode also
+`?cam=px,py,pz,tx,ty,tz`, `?cart=bakso|nasgor` (a cart right now) and `?gallery`.
 
 ## Configuration (`.env`)
 
@@ -152,8 +173,8 @@ bun run assets               # Poly Haven models, textures and skies (downloads,
 bun run assets:character     # MakeHuman/MPFB character + Quaternius/keyframed clips in Blender (BLENDER=/path)
 ```
 
-Sources and licences: [CREDITS.md](CREDITS.md). Design notes: [docs/PLAN.md](docs/PLAN.md); progress and
-decisions: [PROGRESS.md](PROGRESS.md).
+Sources and licences: [CREDITS.md](CREDITS.md). How it works: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md); what comes next:
+[docs/ROADMAP.md](docs/ROADMAP.md); progress and decisions: [PROGRESS.md](PROGRESS.md).
 
 ## Layout
 
@@ -168,7 +189,7 @@ assets/   asset archive (+ raw downloads and Blender output, gitignored)
 
 ## Troubleshooting
 
-- **Nobody shows up:** check the HUD says *connected*; send a prompt in Claude (sessions appear on their next event);
+- **Nobody shows up:** check the HUD shows *live*; send a prompt in Claude (sessions appear on their next event);
   `PARKIRAN_RELAY_DEBUG=1` in `.env` writes relay errors to `logs/`.
 - **"asset failed to load" in the HUD:** run `bun install` again (re-extracts the archive).
 - **Hooks stopped after a Bun upgrade:** `bun run install-hooks` again (the hook pins the bun binary path).

@@ -28,7 +28,9 @@ export type Clip =
   | "stubOut"
   | "closeLaptop"
   | "wave"
-  | "phone";
+  | "phone"
+  /** Walking behind a food cart, hands on its handles (street vendors). */
+  | "push";
 
 export type NeedKind = "permission" | "question" | "input";
 
@@ -64,7 +66,11 @@ export interface PropState {
   zzz: boolean;
   /** Scrolling a phone (idle). */
   phone: boolean;
+  /** Check badge over the head while stretching after a finished turn. */
+  done: boolean;
 }
+
+export type Reaction = "failure" | "done" | "wave";
 
 export interface Frame {
   visible: boolean;
@@ -83,6 +89,8 @@ export interface Frame {
   blend: number;
   typingRate: number;
   walkSpeed: number;
+  /** Head turn (rad, + towards +yaw) while chatting with a neighbour; 0 otherwise. */
+  look: number;
   props: PropState;
 }
 
@@ -110,6 +118,11 @@ const STAND_S = 1.04;
 const FRUSTRATED_S = 2.42;
 /** Length of the phone idle loop (clips.json). */
 const PHONE_S = 12;
+const STRETCH_S = 3.2;
+const WAVE_S = 2.0;
+const CHAT_S = 2.917;
+/** Furthest the head turns towards a chatting neighbour. */
+const LOOK_MAX = 1.0;
 
 const sameTarget = (a: Target | null, b: Target): boolean => {
   if (a === null || a.kind !== b.kind) return false;
@@ -155,9 +168,13 @@ export class Brain {
   private prevClipTime = 0;
   private blend = 1;
   private typingRate = 1;
-  private readonly props: PropState = { laptop: "closed", cigarette: "none", lighter: false, flame: false, cup: false, bubble: null, zzz: false, phone: false };
+  private readonly props: PropState = { laptop: "closed", cigarette: "none", lighter: false, flame: false, cup: false, bubble: null, zzz: false, phone: false, done: false };
   private pendingReactions: Step[] = [];
-  private hasNeighbour = false;
+  /** Where the neighbour sits while the two of them chat (decided per pair by the scene), else null. */
+  private chatWith: Vec2 | null = null;
+  /** Walked in and not sat down at home yet; `arrived` reports the moment it does, once. */
+  private arriving = false;
+  private arrived = false;
   private mouthTime = 0;
   /** True once the character has walked off after leaving. */
   done = false;
@@ -207,6 +224,7 @@ export class Brain {
     this.props.flame = false;
     this.props.zzz = false;
     this.props.bubble = null;
+    this.props.done = false;
     this.setClip(seated ? "sitIdle" : "standIdle");
     this.blend = 1;
   }
@@ -223,8 +241,21 @@ export class Brain {
     if (this.target?.kind === "warung" && this.props.cup) this.interrupt([]);
   }
 
-  setNeighbour(present: boolean): void {
-    this.hasNeighbour = present;
+  /** Chat with the neighbour sitting at `at` (both idle, their chat window open), or stop with null. */
+  setChat(at: Vec2 | null): void {
+    if ((at === null) === (this.chatWith === null)) {
+      this.chatWith = at;
+      return;
+    }
+    this.chatWith = at;
+    if (this.target?.kind === "seated" && this.target.activity === "idle") this.interrupt([]);
+  }
+
+  /** True once, right after the person walked in and sat down at home (to greet the neighbours). */
+  takeArrival(): boolean {
+    const a = this.arrived;
+    this.arrived = false;
+    return a;
   }
 
   /** `outcome` is the session's last need outcome; it decides how a "needs" episode ends. */
@@ -244,10 +275,20 @@ export class Brain {
     this.interrupt([]);
   }
 
-  /** One-shot reaction (tool failure) that plays without changing the target. */
-  react(kind: "failure"): void {
-    if (kind !== "failure" || this.posture === "offstage" || this.target?.kind === "gone") return;
-    this.pendingReactions.push(this.clipStep("frustrated", FRUSTRATED_S));
+  /**
+   * One-shot reaction that plays without changing the target: a facepalm on a failure, a wave at a neighbour, and a
+   * stretch with a check badge when a turn is done (only seated at home: after a denied permission it would cut into
+   * the sigh).
+   */
+  react(kind: Reaction): void {
+    if (this.posture === "offstage" || this.target?.kind === "gone") return;
+    const queued = (clip: Clip) => this.pendingReactions.some((s) => s.type === "clip" && s.clip === clip);
+    if (kind === "failure") this.pendingReactions.push(this.clipStep("frustrated", FRUSTRATED_S));
+    else if (kind === "wave") {
+      if (!queued("wave")) this.pendingReactions.push(this.clipStep("wave", WAVE_S));
+    } else if (this.posture === "seated" && this.perch === this.home && this.target?.kind === "seated" && !queued("stretch")) {
+      this.pendingReactions.push(this.clipStep("stretch", STRETCH_S, { props: { done: true }, propsEnd: { done: false } }));
+    }
   }
 
   private clipStep(clip: Clip, duration: number, extra: Partial<Extract<Step, { type: "clip" }>> = {}): Step {
@@ -308,6 +349,10 @@ export class Brain {
     if (s?.type === "clip") {
       if (s.propsEnd) Object.assign(this.props, s.propsEnd);
       if (s.posture) this.posture = s.posture;
+      if (s.clip === "sitDown" && this.arriving && this.perch === this.home) {
+        this.arriving = false;
+        this.arrived = true;
+      }
     }
     this.step = null;
   }
@@ -319,6 +364,7 @@ export class Brain {
       case "spawn":
         [this.x, this.z] = SPAWN_POINT;
         this.posture = "standing";
+        this.arriving = true;
         break;
       case "walk":
         this.setClip("walk");
@@ -386,6 +432,14 @@ export class Brain {
       ...(seated && this.props.laptop === "open" ? [this.clipStep("closeLaptop", 1.0, { propsEnd: { laptop: "closed" } })] : []),
       ...this.lightIfNeeded(),
       this.clipStep("phone", PHONE_S, { loop: true, props: { phone: true, cigarette: seated ? "lit" : "mouth" }, propsEnd: { phone: false, cigarette: "mouth" } }),
+    ];
+  }
+
+  /** Two idle neighbours talking: laptop shut, phone away, heads turned to each other (`look`). */
+  private chatActivity(): Step[] {
+    return [
+      ...(this.props.laptop === "open" ? [this.clipStep("closeLaptop", 1.0, { propsEnd: { laptop: "closed" } })] : []),
+      this.clipStep("chat", CHAT_S * 4, { loop: true, props: { phone: false } }),
     ];
   }
 
@@ -464,7 +518,10 @@ export class Brain {
       return [...shut, this.clipStep("doze", 4, { loop: true, props: { zzz: true, cigarette: "none", phone: false } })];
     }
     if (this.props.zzz) this.props.zzz = false;
-    if (t.activity === "idle") return this.props.cup ? [this.clipStep("sip", 3.5, { propsEnd: { cup: false } }), ...this.idleActivity()] : this.idleActivity();
+    if (t.activity === "idle") {
+      const activity = this.chatWith ? this.chatActivity() : this.idleActivity();
+      return this.props.cup ? [this.clipStep("sip", 3.5, { propsEnd: { cup: false } }), ...activity] : activity;
+    }
     // Work from here on: laptop open, both hands free.
     if (this.props.laptop !== "open") this.props.laptop = "open";
     if (this.props.cup) return [this.clipStep("sip", 3.5, { propsEnd: { cup: false } })];
@@ -545,6 +602,11 @@ export class Brain {
     if (this.mouthTime > MOUTH_CIGARETTE_S) this.props.cigarette = "none";
     if (this.posture === "seated") this.sit = 1;
     if (this.posture !== "seated" && !(this.step?.type === "clip" && (this.step.clip === "sitDown" || this.step.clip === "standUp"))) this.sit = 0;
+    let look = 0;
+    if (this.clip === "chat" && this.chatWith) {
+      const toward = Math.atan2(this.chatWith[0] - this.x, this.chatWith[1] - this.z);
+      look = Math.max(-LOOK_MAX, Math.min(LOOK_MAX, angleDiff(this.yaw, toward)));
+    }
 
     return {
       visible: this.posture !== "offstage" && !this.done,
@@ -561,6 +623,7 @@ export class Brain {
       blend: this.blend,
       typingRate: this.typingRate,
       walkSpeed: WALK_SPEED,
+      look,
       props: { ...this.props },
     };
   }

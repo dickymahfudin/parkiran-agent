@@ -42,7 +42,8 @@ session of the user in another repo.
   packs extracted with MPFB's own `AssetService.fix_and_extract_asset_pack_zip`.
 - `scripts/blender/make_character.py` builds the character headlessly in ~20 s: MPFB `mixamo` rig (52
   `mixamorig:*` bones), clothes weighted by MPFB, three body variants with covered skin removed, grey tintable
-  garment textures, alpha modes fixed (OPAQUE body/clothes, MASK hair/brows/lashes). Exports GLB + FBX for Mixamo.
+  garment textures, alpha modes fixed (OPAQUE body/clothes, MASK hair/brows/lashes). Exports a GLB (the FBX export
+  for Mixamo was dropped with Mixamo itself).
 - First pick (`elvs_crude_t-shirt_male` + `cortu_jeans_shorts`) looked wrong (tight scoop-neck top, hot pants);
   replaced by `toigo_basic_tucked_t-shirt` (hem lengthened 8 cm so it reads as an untucked kaos oblong),
   `namuhekam_male_polo_shirt`, `elvs_male_swim_shorts1` (tie-dye texture replaced by plain fabric),
