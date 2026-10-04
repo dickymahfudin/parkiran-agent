@@ -1,5 +1,5 @@
-// Crew accessories: every session of a project wears the same one (a peci or glasses), so a repo's people read as one
-// crew. Procedural, a few draws each, placed on the head anchor by Person. No cloth on the people (user's choice).
+// Head accessories, picked per session (`accessoryFor`): a peci or glasses. Procedural, a few draws each, placed on the
+// head anchor by Person. No cloth on the people (user's choice).
 import * as THREE from "three";
 import type { Accessory } from "./identity.ts";
 
@@ -12,11 +12,15 @@ const MAT = {
   lens: new THREE.MeshStandardMaterial({ color: "#1c2630", roughness: 0.05, metalness: 0.4, transparent: true, opacity: 0.35 }),
 };
 
-/** Black velvet peci, a little tilted back. Head anchor at the skull centre. */
+/**
+ * Black velvet peci, a little tilted back, hugging the head (the hair shows below it). Head anchor at the skull centre.
+ * Its rim sits 12 mm above the anchor and its top must stay above the cropped hair, or the hair pokes through the
+ * crown seen from above (0.062 m tall still did).
+ */
 function Peci() {
   return (
-    <mesh position={[0, 0.054, -0.006]} rotation={[-0.12, 0, 0]} scale={[1, 1, 1.18]} material={MAT.velvet} castShadow>
-      <cylinderGeometry args={[0.088, 0.094, 0.064, 28]} />
+    <mesh position={[0, 0.048, -0.004]} rotation={[-0.12, 0, 0]} scale={[1, 1, 1.16]} material={MAT.velvet} castShadow>
+      <cylinderGeometry args={[0.076, 0.081, 0.072, 28]} />
     </mesh>
   );
 }

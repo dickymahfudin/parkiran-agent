@@ -159,7 +159,7 @@ export function FoodCart() {
   const state = useMemo(() => ({ pass: null as CartPass | null, now: 0, nextCall: 0 }), []);
   const vendor = useMemo(() => vendorAnimator(state), [state]);
   const tmp = useMemo(() => ({ rel: new THREE.Vector3(), right: new THREE.Vector3() }), []);
-  const look = useMemo(() => ({ ...lookFor("pedagang-keliling"), cap: "#1d1f22", accessory: null }), []);
+  const look = useMemo(() => ({ ...lookFor("pedagang-keliling"), cap: "#1d1f22", accessory: null, habit: "none" as const }), []);
 
   useFrame(() => {
     const now = Date.now();

@@ -75,13 +75,18 @@ unless you pass `--allow-reformat`. Both scripts accept `--dry-run` and `--setti
 | Turn done | leans back for a stretch, a check badge pops up over the head, a soft "ting" |
 | `idle` | shuts the laptop, lights a cigarette and scrolls the phone, with the odd drag; two idle neighbours now and then turn to each other for a chat |
 | Tool or turn failure (`error`) | facepalm, then back to work |
-| `compacting` | buys a kopi at the warung window, drinks it on a free warung stool (or back on its own seat), walks back when done |
+| `compacting` | buys a kopi at the warung window, drinks it on a free warung stool (or back on its own seat) with the kopi in one hand and the kretek or vape in the other, walks back when done |
 | Subagent | a friend walks in and sits next to the parent (or on any free seat), leaves when done |
 | Idle for 30 min (`dozing`) | laptop shut, dozes off, Zzz |
 | Session ends (`leaving`) | stubs out the cigarette, closes the laptop, walks away |
 
-Everyone working on the same project wears the same thing, a black peci or glasses, so a repo's sessions (and their
-subagent friends) read as one crew. By each seat a tin ashtray fills up with butts as the session ages (one per 15
+Not everyone smokes kretek: about 70 % do, a quarter vape (the pod held upright in a closed fist, brought to the lips; no
+lighter; the LED glows on a pull and they blow thick white clouds) and 5 % do not smoke at all (they type while thinking and sip a kopi over the phone when idle). The
+table above is the kretek smoker's version; a vaper or a non-smoker asked for permission gets a key bubble instead of
+the lighter and sits back down without lighting up.
+
+About one person in ten wears a black peci and three in ten glasses, picked per session (a cap, one in five, never
+goes over a peci). By each seat a tin ashtray fills up with butts as the session ages (one per 15
 minutes) and an empty kopi glass stays behind after every compaction, so you can tell an old session from a new one
 without the HUD.
 
@@ -121,7 +126,9 @@ night, the lighter, a soft "ting" when a turn is done, the food carts' calls, an
 
 **HUD:** the session list shows each character's shirt colour next to the project, a summary of how many sessions
 need you, work or idle, and the tool and age of every session (MCP tools read as "Claude Browser › javascript_tool";
-sessions of the same project and branch are told apart as `#2`, `#3`). Click a row or a character for details (state,
+sessions of the same project and branch are told apart as `#2`, `#3`). Sessions waiting on you sit at the top; from six
+sessions on each one takes a single line, the panel stops at 58 % of the window and scrolls, the summary chips filter
+the list by state, and the fold button tucks it away down to the summary (remembered per browser). Click a row or a character for details (state,
 tool, calls, how often it asked you and how long it waited for you, its last hour as a strip, and its tool mix); the camera
 follows it, `Esc` lets go). Sessions waiting on you also appear as a banner at the top until they are handled; the event
 feed has an "All / Needs you" filter and marks milestones (100 tool calls, 1 h of work, the 2nd compaction). The toolbar has free / cinematic camera, reset view, compact mode for a second

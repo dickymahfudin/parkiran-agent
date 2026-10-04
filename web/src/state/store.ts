@@ -75,6 +75,8 @@ interface AppState {
   audioEnabled: boolean;
   audioUnlocked: boolean;
   notificationsEnabled: boolean;
+  /** The session list folded down to its header and summary (remembered in this browser). */
+  sessionsCollapsed: boolean;
   /** Needs the user has seen (clicked the character): session id → need.since. Stops the repeating sound only. */
   acknowledged: Record<string, number>;
   setConnection(status: ConnectionStatus, error?: string | null): void;
@@ -91,6 +93,7 @@ interface AppState {
   setAudioEnabled(on: boolean): void;
   unlockAudio(): void;
   setNotificationsEnabled(on: boolean): void;
+  setSessionsCollapsed(on: boolean): void;
   acknowledge(sessionId: string): void;
 }
 
@@ -114,6 +117,7 @@ export const useApp = create<AppState>((set) => ({
   audioEnabled: pref("audio", true),
   audioUnlocked: false,
   notificationsEnabled: pref("notifications", true),
+  sessionsCollapsed: pref("sessionsCollapsed", false),
   acknowledged: {},
 
   setTimeOverride: (timeOverride) => set({ timeOverride }),
@@ -171,6 +175,10 @@ export const useApp = create<AppState>((set) => ({
   setNotificationsEnabled: (notificationsEnabled) => {
     savePref("notifications", notificationsEnabled);
     set({ notificationsEnabled });
+  },
+  setSessionsCollapsed: (sessionsCollapsed) => {
+    savePref("sessionsCollapsed", sessionsCollapsed);
+    set({ sessionsCollapsed });
   },
   acknowledge: (sessionId) =>
     set((st) => {

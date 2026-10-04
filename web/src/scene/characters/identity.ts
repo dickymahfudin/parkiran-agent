@@ -4,8 +4,10 @@ export type ShirtStyle = "tee" | "polo";
 export type LegStyle = "shorts" | "trunks" | "pants";
 export type HairStyle = "short01" | "short02" | "short04";
 export type PrintStyle = "plain" | "stripe" | "chest" | "pocket";
-/** Worn by everyone working on the same project (subagent friends too), so a repo's sessions read as one crew. */
+/** Something on the head besides hair, picked per session. */
 export type Accessory = "peci" | "glasses";
+/** What someone smokes, if anything: kretek (lighter, lit tip, smoke), a vape (thick white clouds), or nothing. */
+export type Habit = "kretek" | "vape" | "none";
 
 export interface Look {
   skin: string;
@@ -19,6 +21,7 @@ export interface Look {
   hairColor: string;
   cap: string | null;
   accessory: Accessory | null;
+  habit: Habit;
   sandals: string;
   /** Uniform scale around 1 (height variation). */
   scale: number;
@@ -68,14 +71,19 @@ const SANDAL_COLORS = ["#1d2a8a", "#1f7a3a", "#202020", "#b8322b", "#e0e0e0"];
 const SKIN_LIGHT = "#e2b48c";
 const SKIN_DARK = "#8e5b3c";
 
-const ACCESSORIES: readonly Accessory[] = ["peci", "glasses"];
-
-/** The crew accessory of a project: the same project always gets the same one. */
-export function crewOf(project: string): Accessory {
-  return ACCESSORIES[hash32(`crew:${project}`) % ACCESSORIES.length]!;
+/** 70 % smoke kretek, 25 % vape, 5 % do not smoke; separate from the look's own random rolls. */
+export function habitFor(id: string): Habit {
+  const roll = hash32(`habit:${id}`) % 100;
+  return roll < 70 ? "kretek" : roll < 95 ? "vape" : "none";
 }
 
-export function lookFor(id: string, project: string | null = null): Look {
+/** 10 % wear a peci, 30 % glasses, the rest nothing; per session, separate from the look's own random rolls. */
+export function accessoryFor(id: string): Accessory | null {
+  const roll = hash32(`accessory:${id}`) % 100;
+  return roll < 10 ? "peci" : roll < 40 ? "glasses" : null;
+}
+
+export function lookFor(id: string): Look {
   const seed = hash32(id);
   const r = rng(seed);
   const shirt: ShirtStyle = r() < 0.25 ? "polo" : "tee";
@@ -89,9 +97,9 @@ export function lookFor(id: string, project: string | null = null): Look {
   const legsColor = pick(r, LEG_COLORS[legs]);
   const hair = pick(r, ["short01", "short02", "short04"] as const);
   const hairColor = pick(r, HAIR_COLORS);
-  const crew = project ? crewOf(project) : null;
+  const accessory = accessoryFor(id);
   // A peci takes the place of a cap.
-  const cap = r() < 0.2 && crew !== "peci" ? pick(r, CAP_COLORS) : null;
+  const cap = r() < 0.2 && accessory !== "peci" ? pick(r, CAP_COLORS) : null;
   return {
     skin,
     shirt,
@@ -101,10 +109,11 @@ export function lookFor(id: string, project: string | null = null): Look {
     legs,
     legsColor,
     // Fuller hair pokes through a cap; under one, everybody has the cropped cut.
-    hair: cap || crew === "peci" ? "short04" : hair,
+    hair: cap || accessory === "peci" ? "short04" : hair,
     hairColor,
     cap,
-    accessory: crew,
+    accessory,
+    habit: habitFor(id),
     sandals: pick(r, SANDAL_COLORS),
     scale: 0.96 + r() * 0.08,
     seed,

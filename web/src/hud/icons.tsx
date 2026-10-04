@@ -3,6 +3,8 @@ import {
   BellOff,
   Cigarette,
   CigaretteOff,
+  ChevronDown,
+  ChevronUp,
   CircleCheck,
   CircleHelp,
   Clock,
@@ -63,6 +65,8 @@ const ICONS: Record<IconName, LucideIcon> = {
   evening: Sunset,
   auto: Clock,
   milestone: Flag,
+  collapse: ChevronUp,
+  expandList: ChevronDown,
   close: X,
 };
 

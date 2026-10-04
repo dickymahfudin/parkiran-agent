@@ -35,6 +35,8 @@ export type IconName =
   | "evening"
   | "auto"
   | "milestone"
+  | "collapse"
+  | "expandList"
   | "close";
 
 export interface StateLabel {
@@ -140,6 +142,19 @@ function milestoneText(milestone: Extract<Cue, { kind: "milestone" }>["milestone
   if (milestone === "calls") return `${value} tool calls`;
   if (milestone === "work") return `${value} h of work`;
   return `${ordinal(value)} compaction, kopi lagi`;
+}
+
+/** From this many sessions on, the list switches to one line per session. */
+export const DENSE_FROM = 6;
+
+/**
+ * List order: sessions waiting on the user first (longest waiting at the top), everyone else in arrival order, so rows
+ * only move when a need starts or ends.
+ */
+export function orderSessions<T extends Pick<PublicSession, "id" | "need" | "startedAt">>(list: readonly T[]): T[] {
+  const byStart = (a: T, b: T) => a.startedAt - b.startedAt || a.id.localeCompare(b.id);
+  const waiting = list.filter((s) => s.need).sort((a, b) => a.need!.since - b.need!.since || byStart(a, b));
+  return [...waiting, ...list.filter((s) => !s.need).sort(byStart)];
 }
 
 /** Needs first: those are what the user acts on. */

@@ -7,6 +7,7 @@ import { SCENE_PARTS, serverNow, useApp } from "../state/store.ts";
 import { Icon, ParkingMark } from "./icons.tsx";
 import { GROUP_COLOR, TIMELINE_COLOR, TIMELINE_LABEL, formatSpan, timelineSegments, timelineTotals, toolMixRows, waitedTotal } from "./insights.ts";
 import {
+  DENSE_FROM,
   MOOD_COLOR,
   MOOD_NAME,
   NEED_ICON,
@@ -17,9 +18,11 @@ import {
   formatDuration,
   formatToolName,
   moodCounts,
+  orderSessions,
   sessionName,
   shortId,
   stateLabel,
+  type Mood,
 } from "./labels.ts";
 
 function useNow(intervalMs: number): number {
@@ -68,7 +71,7 @@ function SessionRow({ s, now, selected, onSelect }: { s: PublicSession; now: num
   const friends = Object.keys(s.subagents).length;
   const tool = s.currentTool ?? s.lastTool;
   return (
-    <button type="button" className={`session-row mood-${label.mood}${selected ? " selected" : ""}`} onClick={onSelect} aria-pressed={selected}>
+    <button type="button" className={`session-row mood-${label.mood}${selected ? " selected" : ""}`} onClick={onSelect} aria-pressed={selected} data-session={s.id}>
       <Avatar s={s} />
       <span className="session-main">
         <span className="project">{sessionName(s, twins)}</span>
@@ -85,20 +88,61 @@ function SessionRow({ s, now, selected, onSelect }: { s: PublicSession; now: num
         {friends > 0 && <span>+{friends} subagent</span>}
         <span>{formatAge(now - s.lastEventAt)}</span>
       </span>
+      <span className="row-age">{formatAge(now - s.lastEventAt)}</span>
     </button>
   );
 }
 
-function Summary({ list, now }: { list: PublicSession[]; now: number }) {
+/** Counts per state; each chip also filters the list to that state (click again for all). */
+function Summary({ list, now, filter, onFilter }: { list: PublicSession[]; now: number; filter: Mood | null; onFilter(mood: Mood | null): void }) {
   return (
-    <div className="summary" aria-label="Sessions by state">
+    <div className="summary" role="group" aria-label="Sessions by state (click to filter)">
       {moodCounts(list, now).map(({ mood, count }) => (
-        <span key={mood} className={`summary-chip mood-${mood}`}>
+        <button
+          key={mood}
+          type="button"
+          className={`summary-chip mood-${mood}`}
+          aria-pressed={filter === mood}
+          onClick={() => onFilter(filter === mood ? null : mood)}
+          title={filter === mood ? "Show all sessions" : `Show only ${MOOD_NAME[mood]}`}
+        >
           <span className="dot" style={{ background: MOOD_COLOR[mood] }} />
           <b>{count}</b> {MOOD_NAME[mood]}
-        </span>
+        </button>
       ))}
     </div>
+  );
+}
+
+/**
+ * The session list: needs you first, one line per session once there are many, scrolling inside a panel of capped
+ * height, filterable by state and foldable down to its summary.
+ */
+function SessionList({ list, now, compact }: { list: PublicSession[]; now: number; compact: boolean }) {
+  const selectedId = useApp((st) => st.selectedId);
+  const select = useApp((st) => st.select);
+  const collapsed = useApp((st) => st.sessionsCollapsed);
+  const [filter, setFilter] = useState<Mood | null>(null);
+  const ordered = orderSessions(list);
+  const shown = filter ? ordered.filter((s) => stateLabel(s, now).mood === filter) : ordered;
+  // A filter whose state has emptied lets go by itself.
+  useEffect(() => {
+    if (filter && !list.some((s) => stateLabel(s, now).mood === filter)) setFilter(null);
+  }, [filter, list, now]);
+  useEffect(() => {
+    if (selectedId) document.querySelector(`[data-session="${CSS.escape(selectedId)}"]`)?.scrollIntoView({ block: "nearest", behavior: "smooth" });
+  }, [selectedId]);
+  return (
+    <>
+      {!compact && <Summary list={list} now={now} filter={filter} onFilter={setFilter} />}
+      {!collapsed && (
+        <div className="session-list">
+          {shown.map((s) => (
+            <SessionRow key={s.id} s={s} now={now} selected={s.id === selectedId} onSelect={() => select(s.id === selectedId ? null : s.id)} />
+          ))}
+        </div>
+      )}
+    </>
   );
 }
 
@@ -458,6 +502,7 @@ export function Hud() {
   const select = useApp((st) => st.select);
   const assetErrors = useApp((st) => st.assetErrors);
   const compact = useApp((st) => st.compact);
+  const collapsed = useApp((st) => st.sessionsCollapsed);
   const list = Object.values(sessions).sort((a, b) => a.startedAt - b.startedAt);
   const selected = selectedId ? sessions[selectedId] : undefined;
 
@@ -471,7 +516,7 @@ export function Hud() {
 
   return (
     <div className="hud">
-      <section className="panel sessions-panel" aria-label="Sessions">
+      <section className={`panel sessions-panel${list.length >= DENSE_FROM ? " dense" : ""}${collapsed ? " collapsed" : ""}`} aria-label="Sessions">
         <header>
           <ParkingMark />
           <h1>Parkiran Agent</h1>
@@ -479,6 +524,18 @@ export function Hud() {
             <span className="dot" />
             {CONNECTION_TEXT[connection]}
           </span>
+          {list.length > 0 && (
+            <button
+              type="button"
+              className="icon-button fold"
+              aria-expanded={!collapsed}
+              aria-label={collapsed ? "Show the session list" : "Fold the session list"}
+              title={collapsed ? "Show the session list" : "Fold the session list (the summary stays)"}
+              onClick={() => useApp.getState().setSessionsCollapsed(!collapsed)}
+            >
+              <Icon name={collapsed ? "expandList" : "collapse"} />
+            </button>
+          )}
         </header>
         {connectionError && <p className="error">{connectionError}</p>}
         {assetErrors.map((e) => (
@@ -486,18 +543,7 @@ export function Hud() {
             asset failed to load: {e}
           </p>
         ))}
-        {list.length === 0 ? (
-          <EmptyLot />
-        ) : (
-          <>
-            {!compact && <Summary list={list} now={now} />}
-            <div className="session-list">
-              {list.map((s) => (
-                <SessionRow key={s.id} s={s} now={now} selected={s.id === selectedId} onSelect={() => select(s.id === selectedId ? null : s.id)} />
-              ))}
-            </div>
-          </>
-        )}
+        {list.length === 0 ? <EmptyLot /> : <SessionList list={list} now={now} compact={compact} />}
       </section>
       <Attention list={list} now={now} />
       <Toolbar />

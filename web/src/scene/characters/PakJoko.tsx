@@ -22,6 +22,7 @@ const LOOK: Look = {
   hairColor: "#2e2219",
   cap: null,
   accessory: "peci",
+  habit: "kretek",
   scale: 1,
 };
 

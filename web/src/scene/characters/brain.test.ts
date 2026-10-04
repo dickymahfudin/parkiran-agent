@@ -148,6 +148,44 @@ describe("Brain", () => {
     expect(moved.last.props.cup).toBe(true);
   });
 
+  test("coffee break: the kopi in one hand, the cigarette in the other, never both in the lips", () => {
+    const b = seatedBrain({ kind: "seated", activity: "work", work: "think" });
+    runFor(b, 8);
+    b.setTarget({ kind: "warung" }, null, 1);
+    b.setVisit(stool);
+    let sipWithKretekInLips = false;
+    let carryingWithCigaretteInHand = false;
+    let smokedWithCup = false;
+    runFor(b, 60, (f) => {
+      if (f.clip === "sip" && f.sit === 1) sipWithKretekInLips ||= f.props.cigarette === "mouth";
+      // Standing with the kopi, the right hand has the laptop.
+      if (f.props.cup && f.sit === 0) carryingWithCigaretteInHand ||= f.props.cigarette === "lit";
+      if (f.clip === "smoke") smokedWithCup ||= f.props.cup && f.props.cigarette === "lit";
+    });
+    expect(smokedWithCup).toBe(true);
+    expect(sipWithKretekInLips).toBe(false);
+    b.setTarget(WORK, null, 2);
+    const back = runFor(b, 30, (f) => {
+      if (f.props.cup && f.sit === 0) carryingWithCigaretteInHand ||= f.props.cigarette === "lit";
+    });
+    expect(carryingWithCigaretteInHand).toBe(false);
+    // The last sip at home empties the cup and parks the kretek in the lips for typing.
+    expect(back.clips.has("sip")).toBe(true);
+    expect(back.last).toMatchObject({ clip: "type", props: { cup: false, cigarette: "mouth" } });
+  });
+
+  test("a coffee break spent standing (lot full) ends with the cup finished", () => {
+    const b = new Brain({ seed: 42, home: { ...home, seat: null }, atHome: true, target: WORK });
+    b.setTarget(WORK, null, 0);
+    b.setTarget({ kind: "warung" }, null, 1);
+    const trip = runFor(b, 40);
+    expect(trip.last.props.cup).toBe(true);
+    b.setTarget(WORK, null, 2);
+    const back = runFor(b, 10);
+    expect(back.clips.has("sip")).toBe(true);
+    expect(back.last.props.cup).toBe(false);
+  });
+
   test("a tab hidden through a coffee break settles straight onto the warung stool with the cup", () => {
     const b = seatedBrain();
     b.setTarget({ kind: "warung" }, null, 1);
@@ -319,5 +357,79 @@ describe("Brain", () => {
     const b = seatedBrain();
     b.setChat([home.point[0] + 0.6, home.point[1]]);
     expect(runFor(b, 3).last.clip).toBe("type");
+  });
+
+  describe("habits", () => {
+    const habitBrain = (habit: "vape" | "none", target: Target = WORK) => {
+      const b = new Brain({ seed: 42, home, atHome: true, target, habit });
+      b.setTarget(target, null, 0);
+      runFor(b, 0.5);
+      return b;
+    };
+    const IDLE: Target = { kind: "seated", activity: "idle" };
+    const THINK: Target = { kind: "seated", activity: "work", work: "think" };
+
+    test("a vaper never uses a lighter: thinks and idles with the vape in hand", () => {
+      const b = habitBrain("vape");
+      let lighter = false;
+      b.setTarget(THINK, null, 1);
+      const think = runFor(b, 4, (f) => (lighter ||= f.props.lighter || f.props.flame));
+      expect(think.last).toMatchObject({ clip: "think", props: { cigarette: "lit" } });
+      b.setTarget(IDLE, null, 2);
+      const idle = runFor(b, 6, (f) => (lighter ||= f.props.lighter || f.props.flame));
+      expect(idle.last).toMatchObject({ clip: "phone", props: { cigarette: "lit", phone: true } });
+      expect(idle.clips.has("lightUp")).toBe(false);
+      expect(lighter).toBe(false);
+    });
+
+    test("a vaper asked for permission holds the vape, and takes a pull when approved", () => {
+      const b = habitBrain("vape");
+      b.setTarget({ kind: "needs", need: "permission" }, null, 1);
+      expect(runFor(b, 6).last.props).toMatchObject({ cigarette: "unlit", bubble: "permission" });
+      b.setTarget(WORK, { kind: "approved", at: 2 }, 2);
+      const { clips } = runFor(b, 8);
+      expect(clips.has("drag")).toBe(true);
+      expect(clips.has("lightUp")).toBe(false);
+    });
+
+    test("a vaper vapes between sips on a coffee break and puts it away to work", () => {
+      const b = habitBrain("vape");
+      b.setTarget({ kind: "warung" }, null, 1);
+      b.setVisit(stool);
+      let vapedWithCup = false;
+      runFor(b, 60, (f) => (vapedWithCup ||= f.clip === "smoke" && f.props.cup && f.props.cigarette === "lit"));
+      expect(vapedWithCup).toBe(true);
+      b.setTarget(WORK, null, 2);
+      expect(runFor(b, 30).last).toMatchObject({ clip: "type", props: { cup: false, cigarette: "mouth" } });
+    });
+
+    test("a non-smoker on a coffee break just drinks and sits", () => {
+      const b = habitBrain("none");
+      b.setTarget({ kind: "warung" }, null, 1);
+      b.setVisit(stool);
+      const trip = runFor(b, 60);
+      expect(trip.clips.has("sip") && trip.clips.has("sitIdle")).toBe(true);
+      expect(trip.clips.has("smoke")).toBe(false);
+      expect(trip.last.props.cigarette).toBe("none");
+    });
+
+    test("a non-smoker never holds anything to smoke: types while thinking, sips kopi over the phone, waits empty-handed", () => {
+      const b = habitBrain("none");
+      let smoked = false;
+      const watch = (f: Frame) => (smoked ||= f.props.cigarette !== "none" || f.props.lighter);
+      b.setTarget(THINK, null, 1);
+      expect(runFor(b, 3, watch).last.clip).toBe("type");
+      b.setTarget(IDLE, null, 2);
+      expect(runFor(b, 6, watch).last).toMatchObject({ clip: "phone", props: { phone: true, cup: true } });
+      b.setTarget({ kind: "needs", need: "permission" }, null, 3);
+      runFor(b, 6, watch);
+      b.setTarget(WORK, { kind: "approved", at: 4 }, 4);
+      const back = runFor(b, 8, watch);
+      expect(back.clips.has("lightUp")).toBe(false);
+      expect(back.last).toMatchObject({ clip: "type", props: { cup: false } });
+      b.setTarget({ kind: "gone" }, null, 5);
+      expect(runFor(b, 3, watch).clips.has("stubOut")).toBe(false);
+      expect(smoked).toBe(false);
+    });
   });
 });

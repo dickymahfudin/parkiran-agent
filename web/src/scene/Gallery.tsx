@@ -6,7 +6,7 @@ import * as THREE from "three";
 import { Rider } from "./art/Ambient.tsx";
 import { Car, Scooter } from "./art/Vehicles.tsx";
 import type { Clip, Frame, PropState } from "./characters/brain.ts";
-import { lookFor } from "./characters/identity.ts";
+import { lookFor, type Habit } from "./characters/identity.ts";
 import { Person, type Animator } from "./characters/Person.tsx";
 import type { SmokeSource } from "./characters/props.tsx";
 import { SmokeSystem } from "./characters/props.tsx";
@@ -27,6 +27,8 @@ interface Slot {
   seatY?: number;
   /** Head turn towards a chatting neighbour (rad). */
   look?: number;
+  /** Force what the person smokes (else the look's own). */
+  habit?: Habit;
 }
 
 const SLOTS: Slot[] = [
@@ -41,6 +43,15 @@ const SLOTS: Slot[] = [
   { label: "ditolak (sigh)", clip: "sigh", t: 0.8, seated: false, props: { laptop: "closed", cigarette: "unlit" } },
   { label: "santai: rokok", clip: "smoke", t: 0.9, seated: true, props: { cigarette: "lit" } },
   { label: "santai: ngopi", clip: "sip", t: 1.0, seated: true, props: { cup: true } },
+  { label: "compact: seruput (kretek di tangan)", clip: "sip", t: 1.8, seated: true, habit: "kretek", props: { laptop: "closed", cup: true, cigarette: "lit" } },
+  { label: "compact: kopi + kretek", clip: "smoke", t: 2.2, seated: true, habit: "kretek", props: { laptop: "closed", cup: true, cigarette: "lit" } },
+  { label: "compact: kopi + vape", clip: "smoke", t: 2.2, seated: true, habit: "vape", props: { laptop: "closed", cup: true, cigarette: "lit" } },
+  { label: "compact: kopi, santai", clip: "sitIdle", t: 1.6, seated: true, habit: "none", props: { laptop: "closed", cup: true } },
+  { label: "compact: jalan bawa kopi", clip: "walk", t: 0.35, seated: false, habit: "kretek", props: { laptop: "closed", cup: true, cigarette: "mouth" } },
+  { label: "compact: berdiri pegang kopi", clip: "standIdle", t: 1.0, seated: false, habit: "kretek", props: { laptop: "closed", cup: true, cigarette: "mouth" } },
+  { label: "compact: seruput berdiri", clip: "sip", t: 1.8, seated: false, habit: "none", props: { laptop: "closed", cup: true } },
+  { label: "non-smoker: HP + kopi", clip: "phone", t: 0.5, seated: true, habit: "none", props: { laptop: "closed", cup: true, phone: true } },
+  { label: "non-smoker: HP + seruput", clip: "phone", t: 5.0, seated: true, habit: "none", props: { laptop: "closed", cup: true, phone: true } },
   { label: "santai: stretching", clip: "stretch", t: 1.6, seated: true },
   { label: "santai: ngobrol", clip: "chat", t: 0.6, seated: true, look: 0.9, props: { laptop: "closed", cigarette: "lit" } },
   { label: "turn done (stretch)", clip: "stretch", t: 1.4, seated: true, props: { done: true } },
@@ -102,7 +113,8 @@ export function Gallery() {
         const steam: SmokeSource = { active: false, world: new THREE.Vector3(), kind: "steam" };
         smoke.set(`${i}:s`, src);
         smoke.set(`${i}:t`, steam);
-        return { slot, x, z, animator: frozen(slot, x, z), look: lookFor(`gallery-${i}`), src, steam };
+        const look = lookFor(`gallery-${i}`);
+        return { slot, x, z, animator: frozen(slot, x, z), look: slot.habit ? { ...look, habit: slot.habit } : look, src, steam };
       }),
     [],
   );

@@ -2,7 +2,7 @@
 // Pure TypeScript (no three.js) so it can be unit tested and reused by both the placeholder and the rigged character.
 import type { WorkKind } from "../../../../shared/src/tools.ts";
 import { COUNTER, DESPAWN_POINT, SPAWN_POINT, WALK_SPEED, planPath, type SeatStyle, type Vec2 } from "../layout.ts";
-import { rng } from "./identity.ts";
+import { rng, type Habit } from "./identity.ts";
 
 export type Clip =
   | "walk"
@@ -57,7 +57,10 @@ export interface Home {
 
 export interface PropState {
   laptop: "open" | "closed" | "none";
-  /** "mouth": lit and parked in the lips while both hands work. */
+  /**
+   * "mouth": lit and parked in the lips while both hands work. A vaper's device: "lit" / "unlit" in the hand, "mouth"
+   * put away. A non-smoker's stays "none".
+   */
   cigarette: "none" | "unlit" | "lit" | "mouth";
   lighter: boolean;
   flame: boolean;
@@ -112,6 +115,10 @@ const TYPING_RATE: Record<WorkKind, number> = { think: 0.8, read: 0.45, bash: 1.
 // Durations of the rigged sitDown / standUp / frustrated clips (clips.json).
 const SIT_S = 1.29;
 const THINK_S = 6.667;
+/** Length of the seated smoking loop (clips.json). */
+const SMOKE_S = 6.667;
+/** Time on one sip of kopi (the clip is 4 s; its last half second blends into what follows). */
+const SIP_S = 3.5;
 /** A cigarette left in the lips while working burns down after this long. */
 const MOUTH_CIGARETTE_S = 240;
 const STAND_S = 1.04;
@@ -142,10 +149,13 @@ export interface BrainOptions {
   atHome: boolean;
   /** Initial target, used to pick the starting posture when `atHome`. */
   target: Target;
+  /** What this person smokes, if anything (default kretek). */
+  habit?: Habit;
 }
 
 export class Brain {
   private readonly random: () => number;
+  private readonly habit: Habit;
   private home: Home;
   /** The seat sat on, or about to be: home, or a warung stool on a coffee break. */
   private perch: Home;
@@ -181,6 +191,7 @@ export class Brain {
 
   constructor(opts: BrainOptions) {
     this.random = rng(opts.seed ^ 0x9e3779b9);
+    this.habit = opts.habit ?? "kretek";
     this.home = opts.home;
     this.perch = opts.home;
     if (opts.atHome && opts.target.kind !== "gone") {
@@ -297,6 +308,9 @@ export class Brain {
 
   private exitNeeds(outcome: Outcome["kind"], need: NeedKind): Step[] {
     const sitBack = this.sitBack();
+    if (this.habit === "none") {
+      return [this.clipStep(outcome === "denied" ? "sigh" : "standIdle", outcome === "denied" ? 1.6 : 0.6, { props: { bubble: null } }), ...sitBack];
+    }
     if (outcome === "denied") {
       return [
         this.clipStep("sigh", 1.6, { props: { bubble: null } }),
@@ -305,6 +319,8 @@ export class Brain {
       ];
     }
     if (need === "question") return [this.clipStep("standIdle", 0.6, { props: { bubble: null } }), ...sitBack];
+    // Approved: a vaper takes a long pull straight away (no lighter).
+    if (this.habit === "vape") return [this.clipStep("drag", 1.5, { props: { bubble: null, cigarette: "lit" } }), ...sitBack];
     return [
       this.clipStep("lightUp", 1.8, { props: { bubble: null, lighter: true, flame: true }, propsEnd: { lighter: false, flame: false, cigarette: "lit" } }),
       this.clipStep("drag", 1.5),
@@ -413,11 +429,28 @@ export class Brain {
   }
 
   private standUp(extra: Partial<PropState> = {}): Step {
-    return this.clipStep("standUp", STAND_S, { props: { laptop: "closed", zzz: false, phone: false, ...extra }, posture: "standing" });
+    // On their feet with the kopi in the left hand, the right one carries the laptop: a cigarette held in it goes to the
+    // lips (a vape back in the pocket).
+    const handFree = this.props.cup && this.props.cigarette === "lit" ? { cigarette: "mouth" as const } : {};
+    return this.clipStep("standUp", STAND_S, { props: { laptop: "closed", zzz: false, phone: false, ...handFree, ...extra }, posture: "standing" });
   }
 
+  /**
+   * A sip of kopi from the left hand. Seated, a kretek parked in the lips moves to the right hand first so they are
+   * free; the last sip (`finish`) empties the cup and parks whatever is burning again, ready for work.
+   */
+  private sip(finish = false): Step {
+    const toHand = this.posture === "seated" && this.habit === "kretek" && this.props.cigarette === "mouth";
+    const burning = this.props.cigarette === "lit" || this.props.cigarette === "mouth";
+    return this.clipStep("sip", SIP_S, {
+      ...(toHand ? { props: { cigarette: "lit" } } : {}),
+      ...(finish ? { propsEnd: { cup: false, ...(burning ? { cigarette: "mouth" } : {}) } } : {}),
+    });
+  }
+
+  /** A kretek needs the lighter first; a vape just comes out of the pocket (the next step holds it), nothing for the rest. */
   private lightIfNeeded(): Step[] {
-    if (this.props.cigarette === "lit" || this.props.cigarette === "mouth") return [];
+    if (this.habit !== "kretek" || this.props.cigarette === "lit" || this.props.cigarette === "mouth") return [];
     return [this.clipStep("lightUp", 1.4, { props: { cigarette: "unlit", lighter: true, flame: true }, propsEnd: { lighter: false, flame: false, cigarette: "lit" } })];
   }
 
@@ -428,8 +461,13 @@ export class Brain {
    */
   private idleActivity(): Step[] {
     const seated = this.posture === "seated";
+    const shut = seated && this.props.laptop === "open" ? [this.clipStep("closeLaptop", 1.0, { propsEnd: { laptop: "closed" } })] : [];
+    // A non-smoker holds a kopi in the free hand instead: the phone clip's drags become sips.
+    if (this.habit === "none") {
+      return [...shut, this.clipStep("phone", PHONE_S, { loop: true, props: { phone: true, cup: seated }, propsEnd: { phone: false, cup: false } })];
+    }
     return [
-      ...(seated && this.props.laptop === "open" ? [this.clipStep("closeLaptop", 1.0, { propsEnd: { laptop: "closed" } })] : []),
+      ...shut,
       ...this.lightIfNeeded(),
       this.clipStep("phone", PHONE_S, { loop: true, props: { phone: true, cigarette: seated ? "lit" : "mouth" }, propsEnd: { phone: false, cigarette: "mouth" } }),
     ];
@@ -445,18 +483,21 @@ export class Brain {
 
   /**
    * Compaction is a coffee break: with the cup bought, sit and drink it on a free warung stool, else back on one's own
-   * seat (laptop shut), else standing at one's spot, until the session is back.
+   * seat (laptop shut), else standing at one's spot, until the session is back. The kopi is in the left hand; seated, a
+   * smoker smokes with the right one between sips (a kretek only if one is burning: no lighting up with a full hand).
    */
   private coffeeBreak(): Step[] {
     const place = this.visit ?? this.home;
     if (this.posture === "seated") {
       if (this.perch !== place) return [this.standUp()];
       const shut = this.props.laptop === "open" ? [this.clipStep("closeLaptop", 1.0, { propsEnd: { laptop: "closed" } })] : [];
-      return [...shut, this.clipStep("sip", 3.5), this.clipStep("sitIdle", 5)];
+      const smokes = this.habit === "vape" || (this.habit === "kretek" && (this.props.cigarette === "lit" || this.props.cigarette === "mouth"));
+      const between = smokes ? this.clipStep("smoke", SMOKE_S, { props: { cigarette: "lit" } }) : this.clipStep("sitIdle", 5);
+      return [...shut, this.sip(), between];
     }
     const from = Math.hypot(this.x - place.point[0], this.z - place.point[1]);
     if (from >= 0.2) return [{ type: "walk", path: this.pathTo(place.point, place.node), index: 1 }, { type: "turn", yaw: place.yaw, duration: 0.45 }];
-    if (!place.seat) return [...this.settleOn(place, from), this.clipStep("sip", 3.5), this.clipStep("standIdle", 4)];
+    if (!place.seat) return [...this.settleOn(place, from), this.sip(), this.clipStep("standIdle", 4)];
     this.perch = place;
     return [...this.settleOn(place, from), this.clipStep("sitDown", SIT_S, { posture: "seated" })];
   }
@@ -469,7 +510,8 @@ export class Brain {
       if (this.posture === "offstage") return [{ type: "vanish" }];
       const out: Step[] = [];
       if (this.posture === "seated") {
-        if (this.props.cigarette !== "none") out.push(this.clipStep("stubOut", 1.2, { props: { cigarette: "lit" }, propsEnd: { cigarette: "none" } }));
+        if (this.habit === "kretek" && this.props.cigarette !== "none") out.push(this.clipStep("stubOut", 1.2, { props: { cigarette: "lit" }, propsEnd: { cigarette: "none" } }));
+        else this.props.cigarette = "none";
         if (this.props.laptop === "open") out.push(this.clipStep("closeLaptop", 1.0, { propsEnd: { laptop: "closed" } }));
         out.push(this.standUp());
       }
@@ -488,10 +530,12 @@ export class Brain {
     }
 
     if (t.kind === "needs") {
-      if (this.posture === "seated") return [this.standUp({ cigarette: "unlit", bubble: t.need })];
+      // A smoker holds the cigarette that needs a light; a vaper fiddles with the device; a non-smoker just waits.
+      const holding = this.habit === "none" ? "none" : "unlit";
+      if (this.posture === "seated") return [this.standUp({ cigarette: holding, bubble: t.need })];
       this.props.bubble = t.need;
       // Whatever was smoked before has gone out: this is the one that needs a light.
-      this.props.cigarette = "unlit";
+      this.props.cigarette = holding;
       return [this.clipStep("patPockets", 2.4), this.clipStep("lookAround", 2.8)];
     }
 
@@ -508,7 +552,8 @@ export class Brain {
     }
     if (this.posture === "standing" && !atHome) return this.goHome();
     if (!this.home.seat) {
-      // Lot full: stands with the laptop under the arm.
+      // Lot full: stands with the laptop under the arm (after finishing the kopi, if the break was spent standing).
+      if (this.props.cup) return [this.sip(true)];
       if (t.activity === "idle") return this.idleActivity();
       return [this.clipStep("standIdle", 4, { loop: true })];
     }
@@ -520,13 +565,15 @@ export class Brain {
     if (this.props.zzz) this.props.zzz = false;
     if (t.activity === "idle") {
       const activity = this.chatWith ? this.chatActivity() : this.idleActivity();
-      return this.props.cup ? [this.clipStep("sip", 3.5, { propsEnd: { cup: false } }), ...activity] : activity;
+      return this.props.cup ? [this.sip(true), ...activity] : activity;
     }
     // Work from here on: laptop open, both hands free.
     if (this.props.laptop !== "open") this.props.laptop = "open";
-    if (this.props.cup) return [this.clipStep("sip", 3.5, { propsEnd: { cup: false } })];
+    if (this.props.cup) return [this.sip(true)];
     // Thinking: one hand on the keyboard, the other with a cigarette; when real work starts it moves to the lips.
     if (t.activity === "work" && t.work === "think") {
+      // Nothing to hold: a non-smoker thinks at the keyboard, typing slowly.
+      if (this.habit === "none") return [this.clipStep("type", 4, { loop: true })];
       return [...this.lightIfNeeded(), this.clipStep("think", THINK_S, { loop: true, props: { cigarette: "lit" }, propsEnd: { cigarette: "mouth" } })];
     }
     return [this.clipStep("type", 4, { loop: true })];

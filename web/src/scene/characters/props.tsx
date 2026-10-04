@@ -11,6 +11,8 @@ export interface SmokeSource {
   /** World position of the emitter (cigarette tip or cup rim). */
   world: THREE.Vector3;
   kind?: "smoke" | "steam";
+  /** A vape: no smoke off a tip, and every exhale is a big, thick white cloud. */
+  vape?: boolean;
   /** Smoke only: how much the tip gives off; low while it is drawn on (the smoke goes into the lungs). */
   strength?: number;
   /** Smoke blown out of the mouth after a drag: `t` runs 0…1 over the exhale. */
@@ -25,6 +27,8 @@ const enum Kind {
   Tip = 0,
   Exhale = 1,
   Steam = 2,
+  /** Vape cloud: drawn white like steam (kind > 1.5 in the shader), bigger and denser than a kretek's exhale. */
+  Vape = 3,
 }
 
 interface Puff {
@@ -48,6 +52,7 @@ const KINDS = {
   [Kind.Tip]: { rate: 26, life: [2.4, 3.4], size0: [0.007, 0.012], size1: [0.09, 0.16], alpha: [0.2, 0.3], rise: 0.17 },
   [Kind.Exhale]: { rate: 34, life: [1.8, 2.6], size0: [0.025, 0.04], size1: [0.2, 0.32], alpha: [0.14, 0.2], rise: 0.07 },
   [Kind.Steam]: { rate: 9, life: [1.2, 1.7], size0: [0.01, 0.016], size1: [0.05, 0.08], alpha: [0.07, 0.11], rise: 0.22 },
+  [Kind.Vape]: { rate: 58, life: [2.8, 3.8], size0: [0.04, 0.06], size1: [0.42, 0.64], alpha: [0.22, 0.32], rise: 0.05 },
 } as const;
 
 /**
@@ -231,11 +236,12 @@ export function SmokeSystem({ sources }: { sources: Map<string, SmokeSource> }) 
       const ex = src.exhale;
       if (ex?.active) {
         // Hardest at the start of the breath, trailing off.
-        const push = 0.75 * (1 - ex.t) ** 1.5 + 0.08;
-        emit(`${id}:exhale`, KINDS[Kind.Exhale].rate * (1 - ex.t * 0.6), () => {
+        const kind = src.vape ? Kind.Vape : Kind.Exhale;
+        const push = (src.vape ? 0.95 : 0.75) * (1 - ex.t) ** 1.5 + 0.08;
+        emit(`${id}:exhale`, KINDS[kind].rate * (1 - ex.t * 0.6), () => {
           const spread = 0.12;
           spawn(
-            Kind.Exhale,
+            kind,
             ex.mouth,
             ex.dir.x * push + (Math.random() - 0.5) * spread,
             ex.dir.y * push + 0.03 + (Math.random() - 0.5) * spread * 0.5,
@@ -267,7 +273,7 @@ export function SmokeSystem({ sources }: { sources: Map<string, SmokeSource> }) 
       const kind = KINDS[p.kind];
       // Buoyancy pulls the rise towards its settling speed; air drag eats the sideways push of a breath.
       p.vel.y += (kind.rise - p.vel.y) * 1.5 * dt;
-      const drag = Math.exp(-(p.kind === Kind.Exhale ? 2.4 : 0.6) * dt);
+      const drag = Math.exp(-(p.kind === Kind.Exhale || p.kind === Kind.Vape ? 2.4 : 0.6) * dt);
       p.vel.x *= drag;
       p.vel.z *= drag;
       // Laminar near the source, curling further up: a swirl whose strength grows with age.
@@ -308,6 +314,11 @@ export function BubbleIcon() {
         <path d="M12 2c1.6 2.2 2.6 3.7 2.6 5.1A2.6 2.6 0 0 1 12 9.8a2.6 2.6 0 0 1-2.6-2.7C9.4 5.7 10.4 4.2 12 2z" fill="#ff8a3d" />
         <rect x="8" y="11" width="8" height="11" rx="1.6" fill="#d23c2a" />
         <rect x="8" y="11" width="8" height="2.6" rx="0.8" fill="#9aa3ad" />
+      </svg>
+      {/* Someone who does not smoke kretek is not after a lighter: a key for the permission. */}
+      <svg className="bubble-key" viewBox="0 0 24 24" width="22" height="22" aria-hidden="true">
+        <circle cx="8" cy="12" r="4.2" fill="none" stroke="#c8a03a" strokeWidth="2.6" />
+        <path d="M12 12h9M18 12v3.2M15.5 12v2.4" fill="none" stroke="#c8a03a" strokeWidth="2.6" strokeLinecap="round" />
       </svg>
       <span className="bubble-q">?</span>
     </>

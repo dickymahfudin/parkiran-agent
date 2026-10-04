@@ -372,7 +372,7 @@ HAND_O = {
     "cigHang": ((0.05, -0.45, -1), (1, 0, 0)),
     # Cup upright in front (thumb up), and tipped towards the mouth.
     "cupHold": ((0.3, -1, 0), (1, 0.3, 0)),
-    "cupMouth": ((0.35, -0.8, 0.5), (1, 0.3, -0.2), "head"),
+    "cupMouth": ((0.39, -0.64, 0.77), (1, 0.25, -0.3), "head"),
     # Lighter thumb-up in front of the face; the other hand shields the flame.
     "lighter": ((0.4, -1, 0.1), (1, 0.4, 0), "head"),
     "shield": ((0.5, -1, 0.2), (1, 0.5, 0), "head"),
@@ -415,7 +415,14 @@ REST_TWIST = {"L": (25, -10, 0), "R": (25, 10, 0)}
 # Wrist target for a drag: puts the index/middle finger gap 3.5 cm in front of the lips (web: the filter pokes 3 cm out of
 # the palm side there), with the "cigMouth" hand orientation.
 CIG_AT_MOUTH = ("face", -0.066, -0.032, -0.12)
-CUP_AT_MOUTH = ("mouth", -0.02, -0.07, -0.09)
+# The kopi is held in the left hand (web: the cup prop on the left hand), so the right one keeps the cigarette or vape.
+# At rest it stands upright (thumb up) beside the laptop, or in front of the hip standing; drinking tips it at the lips.
+CUP_REST_SIT = ("hips", 0.2, -0.3, 0.2)
+CUP_REST_STAND = ("pocketL", 0.02, -0.16, 0.16)
+# Wrist targets bringing the rim to the lower lip (measured in the browser against the web cup): the hand beside the
+# cup, left of the mouth, the cup tipped about 50° towards the face.
+CUP_AT_MOUTH = ("mouth", 0.05, -0.06, -0.08)
+CUP_AT_LIPS = ("mouth", 0.05, -0.0215, -0.06)
 
 GESTURES = {
     "type": {"base": "sit", "length": 5.0, "loop": True, "keys": typing_keys(5.0)},
@@ -429,13 +436,14 @@ GESTURES = {
         K(5.4, spine=(6, 0, 0), head=(2, 14, 0), L=SIT_REST_L, R=("hips", -0.24, -0.3, 0.16), oR="cigSide", fR="cig"),
         K(6.667, spine=(6, 0, 0), L=SIT_REST_L, R=SIT_REST_R, fR="cig"),
     ]},
+    # A sip from the left hand; the right one rests on the laptop corner (with the cigarette or vape, if any).
     "sip": {"base": "sit", "length": 4.0, "loop": False, "keys": [
-        K(0.0, spine=(8, 0, 0), L=SIT_REST_L, R=("hips", -0.2, -0.3, 0.2), oR="cupHold", fR="cup"),
-        K(0.9, spine=(4, 0, 0), L=SIT_REST_L, R=CUP_AT_MOUTH, oR="cupMouth", fR="cup"),
-        K(1.3, spine=(0, 0, 0), head=(-18, 0, 0), L=SIT_REST_L, R=("mouth", -0.02, -0.06, -0.06), oR="cupMouth", fR="cup"),
-        K(2.4, spine=(0, 0, 0), head=(-14, 0, 0), L=SIT_REST_L, R=("mouth", -0.02, -0.06, -0.06), oR="cupMouth", fR="cup"),
-        K(3.1, spine=(6, 0, 0), head=(4, 0, 0), L=SIT_REST_L, R=("hips", -0.2, -0.3, 0.2), oR="cupHold", fR="cup"),
-        K(4.0, spine=(8, 0, 0), L=SIT_REST_L, R=("hips", -0.2, -0.3, 0.2), oR="cupHold", fR="cup"),
+        K(0.0, spine=(8, 0, 0), L=CUP_REST_SIT, R=SIT_REST_R, oL="cupHold", fL="cup"),
+        K(0.9, spine=(4, 0, 0), L=CUP_AT_MOUTH, R=SIT_REST_R, oL="cupMouth", fL="cup"),
+        K(1.3, spine=(0, 0, 0), head=(-18, 0, 0), L=CUP_AT_LIPS, R=SIT_REST_R, oL="cupMouth", fL="cup"),
+        K(2.4, spine=(0, 0, 0), head=(-14, 0, 0), L=CUP_AT_LIPS, R=SIT_REST_R, oL="cupMouth", fL="cup"),
+        K(3.1, spine=(6, 0, 0), head=(4, 0, 0), L=CUP_REST_SIT, R=SIT_REST_R, oL="cupHold", fL="cup"),
+        K(4.0, spine=(8, 0, 0), L=CUP_REST_SIT, R=SIT_REST_R, oL="cupHold", fL="cup"),
     ]},
     # Leaning back with the fingers laced behind the head, elbows wide (hands on top of the head showed their palms).
     "stretch": {"base": "sit", "length": 3.2, "loop": False, "keys": [
@@ -616,13 +624,14 @@ GESTURES.update({
         K(5.3, head=(-2, 12, 0), L=("pocketL", 0.0, 0.0, 0.03), R=("pocketR", -0.03, -0.12, 0.1), oR="cigHang", fR="cig"),
         K(7.5, L=("pocketL", 0.0, 0.0, 0.03), R=("pocketR", -0.03, -0.12, 0.1), oR="cigHang", fL="relaxed", fR="cig"),
     ]},
+    # Standing, the right hand carries the laptop while the left one has the kopi.
     "sipStand": {"base": "stand", "length": 4.0, "loop": False, "keys": [
-        K(0.0, R=("pocketR", -0.02, -0.16, 0.16), oR="cupHold", fR="cup"),
-        K(0.9, R=CUP_AT_MOUTH, oR="cupMouth", fR="cup"),
-        K(1.3, head=(-18, 0, 0), R=("mouth", -0.02, -0.06, -0.06), oR="cupMouth", fR="cup"),
-        K(2.4, head=(-14, 0, 0), R=("mouth", -0.02, -0.06, -0.06), oR="cupMouth", fR="cup"),
-        K(3.1, head=(4, 0, 0), R=("pocketR", -0.02, -0.16, 0.16), oR="cupHold", fR="cup"),
-        K(4.0, R=("pocketR", -0.02, -0.16, 0.16), oR="cupHold", fR="cup"),
+        K(0.0, L=CUP_REST_STAND, oL="cupHold", fL="cup"),
+        K(0.9, L=CUP_AT_MOUTH, oL="cupMouth", fL="cup"),
+        K(1.3, head=(-18, 0, 0), L=CUP_AT_LIPS, oL="cupMouth", fL="cup"),
+        K(2.4, head=(-14, 0, 0), L=CUP_AT_LIPS, oL="cupMouth", fL="cup"),
+        K(3.1, head=(4, 0, 0), L=CUP_REST_STAND, oL="cupHold", fL="cup"),
+        K(4.0, L=CUP_REST_STAND, oL="cupHold", fL="cup"),
     ]},
     "frustratedStand": {"base": "stand", "length": 2.4, "loop": False, "keys": [
         K(0.0),
@@ -631,6 +640,36 @@ GESTURES.update({
         K(1.5, spine=(16, 0, 0), head=(22, -10, 0), R=("mouth", -0.01, -0.07, 0.07), oR="facepalm", fR="open", L=("pocketL", 0.02, 0.0, 0.05)),
         K(2.4),
     ]},
+})
+
+
+def holding_cup(keys, at):
+    """The same keys with the left hand holding the kopi upright at `at`; the right one does what it did."""
+    return [dict(k, L=at, oL="cupHold", fL="cup", hL=(0, 0, 0)) for k in keys]
+
+
+def phone_with_cup(keys):
+    """The seated phone loop for a non-smoker: the kopi upright in the right hand, sipped where a smoker takes a drag."""
+    mirror = lambda t: (t[0], -t[1]) + tuple(t[2:])
+    out = []
+    for k in keys:
+        lips = k["oR"] == "cigMouth"
+        out.append(dict(k, R=mirror(CUP_AT_LIPS if lips else CUP_REST_SIT), oR="cupMouth" if lips else "cupHold", fR="cup",
+                        head=(-14, 0, 0) if lips else k["head"]))
+    return out
+
+
+# Between sips the kopi stays in the left hand, upright (web: rigPlay swaps these in while the cup is held).
+GESTURES.update({
+    "phoneCup": {"base": "sit", "length": 12.0, "loop": True, "keys": phone_with_cup(GESTURES["phone"]["keys"])},
+    "cupSit": {"base": "sit", "length": 5.0, "loop": True, "keys": holding_cup(GESTURES["sitIdle"]["keys"], CUP_REST_SIT)},
+    "cupSmoke": {"base": "sit", "length": 6.667, "loop": True, "keys": holding_cup(GESTURES["smoke"]["keys"], CUP_REST_SIT)},
+    "cupStand": {"base": "stand", "length": 5.0, "loop": True, "keys": holding_cup([
+        K(0.0),
+        K(1.8, head=(-4, 14, 0)),
+        K(3.4, head=(6, -10, 0)),
+        K(5.0),
+    ], CUP_REST_STAND)},
 })
 
 RETARGET = {

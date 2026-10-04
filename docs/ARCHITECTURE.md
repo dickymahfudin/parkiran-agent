@@ -141,7 +141,7 @@ animation mixer directly, so hidden-tab catch-up, manual stepping and the frozen
 | turn done | stretch with a check badge and a soft ting (seated at home only), then idle |
 | idle | shuts the laptop, lights up, scrolls the phone with the odd drag (standing: phone in hand, cigarette in the lips); two idle neighbours chat 14 s out of every 80 s, heads turned to each other (`chatPairs`, `Frame.look`) |
 | failure | `frustrated` facepalm, then back to work (one-shot reaction) |
-| compacting | buys a kopi at the serving window, drinks it on a free warung stool (else on its own seat, else standing), walks back when done |
+| compacting | buys a kopi at the serving window, drinks it on a free warung stool (else on its own seat, else standing), walks back when done; the kopi is in the left hand, so the right one keeps the kretek or vape (seated, a smoker smokes between sips; standing, the right hand carries the laptop and a kretek goes to the lips), and the last sip at home empties the cup |
 | dozing | laptop shut, dozes, Zzz |
 | leaving | stubs out the cigarette, shuts the laptop, walks out to the street |
 
@@ -150,8 +150,12 @@ its parent). Gestures always finish; calm loops end as soon as the target change
 new target wants carries on (sessions change state many times while someone walks in).
 
 **Look** (`identity.ts`): a hash of the session id picks the body, shirt style + print + colour, legs, hair, skin tone,
-sandals and a cap (20 %). The project picks a crew accessory, a black peci or glasses (`crewOf`, `Crew.tsx`), worn by
-all its sessions and their friends. The HUD row shows the same shirt colour.
+sandals, a cap (20 %) and a habit (`habitFor`: kretek 70 %, vape 25 %, none 5 %). The brain follows the habit: a vaper
+never lights up (the pod sits upright in a fist closed at runtime, the arm pulled near the lips so its tip meets them;
+the device stays in the hand, `"mouth"` means put away; pulls give thick white `Vape` clouds and an LED
+glow), a non-smoker types while thinking, sips a kopi over the phone when idle, and waits empty-handed for a
+permission (key bubble instead of the lighter). The session also picks a head accessory (`accessoryFor`: peci 10 %, glasses 30 %, none 60 %;
+`Crew.tsx`); a cap never goes over a peci. The HUD row shows the same shirt colour.
 
 **Pak Joko** (`warungOwner.ts`, `PakJoko.tsx`) stands behind the counter with a routine of his own (smoke, sip,
 phone, look around), plays the Interact reach with a glass while anyone is in the `buy` step, and naps on his stool
@@ -180,7 +184,8 @@ as data (bone rotations + IK targets for the hands) with analytic two-bone IK ba
 | `walk`, `standIdle` | UAL `Walk_Loop`, `Idle_Loop` |
 | `sitDown`, `standUp` | UAL `Sitting_Enter`, `Sitting_Exit` (`Sitting_Idle_Loop` is the base under seated gestures) |
 | `chat`, `buy` | UAL `Sitting_Talking_Loop`, `Idle_Talking_Loop` |
-| `sitIdle`, `type`, `think`, `smoke`, `drag`, `sip`, `stretch`, `frustrated`, `patPockets`, `lookAround`, `lightUp`, `sigh`, `pocketCig`, `doze`, `stubOut`, `closeLaptop`, `wave`, `phone` / `phoneStand`, `ride` (scooter riders) | keyframed |
+| `sitIdle`, `type`, `think`, `smoke`, `drag`, `sip` / `sipStand` (left hand), `stretch`, `frustrated`, `patPockets`, `lookAround`, `lightUp`, `sigh`, `pocketCig`, `doze`, `stubOut`, `closeLaptop`, `wave`, `phone` / `phoneStand`, `ride` (scooter riders) | keyframed |
+| `cupSit`, `cupSmoke`, `cupStand`, `phoneCup` | keyframed: the same moves with the kopi held upright (`rigPlay` swaps them in while a cup is held; walking keeps the legs and plays `cupStand` above them) |
 | `push` | UAL `Walk_Loop` legs + the `Interact` reach held still (`RigPlay.upperAt`) |
 
 Runtime: the lower body plays the posture clip and the upper body the gesture clip (`rig.ts`), so a gesture works
@@ -227,7 +232,8 @@ Doppler), laptop keys while sessions work, birds in the morning, crickets at nig
 the food carts' "ting-ting" / "tek-tek", and the needs-you chime.
 
 **HUD** (`hud/`): session list (shirt colour, project with a `#2` for twins of one project + branch, branch, state chip,
-readable tool name, calls, age), summary chips, a needs-you banner, detail panel, event feed with an "All / Needs you"
+readable tool name, calls, age; needs first, one line each from six sessions, height capped with the list scrolling,
+foldable), summary chips that filter the list, a needs-you banner, detail panel, event feed with an "All / Needs you"
 filter, toolbar (camera mode, reset view, compact, sound, notifications, time of day). The detail panel adds asks,
 time waited for the user, the last hour as a labelled strip and the tool mix (`hud/insights.ts`). Panels are frosted
 (`-webkit-backdrop-filter` must come before `backdrop-filter`, or the minifier drops the standard one). Labels are pure and tested (`labels.ts`); icons are Lucide.

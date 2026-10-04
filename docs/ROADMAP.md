@@ -123,7 +123,8 @@ looks static.
   shoulder. One accessory per project, so sessions of the same repo look like one crew.
 - **Done when:** a 10-person crowd screenshot shows no two people that look the same at overview distance.
 - **Built:** the user asked for no cloth on the people, so the towel and the headband were dropped: every project
-  wears either a black peci or glasses (`crewOf`, `Crew.tsx`). `final-crew-peci.jpg`, `final-crew-glasses.jpg`
+  wore either a black peci or glasses. Later the user chose per-session randomness instead: peci 10 %, glasses 30 %,
+  nothing 60 % (`accessoryFor`, `Crew.tsx`). `final-crew-peci.jpg`, `final-crew-glasses.jpg`
 
 ### B6. Ambient events (food carts done; drizzle *not now*)
 

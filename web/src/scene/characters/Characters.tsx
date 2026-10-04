@@ -234,11 +234,11 @@ export function Characters() {
     const ensure = (key: string, sessionId: string, agentId: string | null, home: { home: Home; key: string }, target: Target): Entry => {
       let e = entries.current.get(key);
       if (!e) {
-        const look = lookFor(agentId ?? sessionId, useApp.getState().sessions[sessionId]?.project ?? null);
+        const look = lookFor(agentId ?? sessionId);
         const atHome = initialIds.current!.has(sessionId) && (agentId === null || target.kind !== "gone");
         const smoke: SmokeSource = { active: false, world: new THREE.Vector3(), kind: "smoke" };
         const steam: SmokeSource = { active: false, world: new THREE.Vector3(), kind: "steam" };
-        e = { key, sessionId, agentId, look, homeKey: home.key, smoke, steam, brain: new Brain({ seed: look.seed, home: home.home, atHome, target }) };
+        e = { key, sessionId, agentId, look, homeKey: home.key, smoke, steam, brain: new Brain({ seed: look.seed, home: home.home, atHome, target, habit: look.habit }) };
         entries.current.set(key, e);
         smokeSources.set(`${key}:smoke`, smoke);
         smokeSources.set(`${key}:steam`, steam);

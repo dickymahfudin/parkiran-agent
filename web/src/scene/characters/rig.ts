@@ -65,8 +65,30 @@ const ALWAYS: Partial<Record<Clip, string>> = {
   wave: "wave",
 };
 
-export function rigPlay(clip: Clip, seated: boolean): RigPlay {
+/**
+ * With the kopi in the left hand, the clips that would let that arm hang or rest on the laptop (and tip the cup over)
+ * play a variant that holds it upright; walking keeps the legs and carries the cup in front.
+ */
+const HOLDING_CUP: Partial<Record<Clip, { seated?: string; standing?: string }>> = {
+  sitIdle: { seated: "cupSit" },
+  smoke: { seated: "cupSmoke" },
+  standIdle: { standing: "cupStand" },
+};
+
+export type CupHand = "left" | "right";
+
+/**
+ * `cup`: the hand holding a kopi, if any. The left one is the usual; the right one only beside the phone (seated, left
+ * hand), where the sips take the place of a smoker's drags.
+ */
+export function rigPlay(clip: Clip, seated: boolean, cup: CupHand | null = null): RigPlay {
   if (clip === "push") return { lower: "walk", upper: "interact", upperAt: PUSH_POSE_S };
+  if (cup === "left") {
+    if (clip === "walk") return { lower: "walk", upper: "cupStand" };
+    const held = HOLDING_CUP[clip]?.[seated ? "seated" : "standing"];
+    if (held) return { full: held };
+  }
+  if (cup === "right" && clip === "phone" && seated) return { full: "phoneCup" };
   const name = (seated ? SEATED[clip] : STANDING[clip]) ?? ALWAYS[clip];
   if (!name) throw new Error(`no rig clip for ${clip}`);
   // The stretch was keyed seated and the wave standing: the other posture plays it from the waist up.

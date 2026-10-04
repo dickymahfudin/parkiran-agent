@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import type { PublicSession } from "../../../shared/src/protocol.ts";
-import { assignTwinNumbers, cueLine, formatAge, formatToolName, moodCounts, sessionName, stateLabel } from "./labels.ts";
+import { assignTwinNumbers, cueLine, formatAge, formatToolName, moodCounts, orderSessions, sessionName, stateLabel } from "./labels.ts";
 
 const session = (over: Partial<PublicSession>): PublicSession =>
   ({ id: "s", phase: "idle", work: "other", need: null, dozing: false, lastOutcome: null, subagents: {}, ...over }) as unknown as PublicSession;
@@ -29,6 +29,13 @@ describe("labels", () => {
     expect(cueLine({ kind: "milestone", sessionId: "s", milestone: "calls", value: 100 })).toEqual({ icon: "milestone", text: "100 tool calls", mood: "working" });
     expect(cueLine({ kind: "milestone", sessionId: "s", milestone: "work", value: 2 }).text).toBe("2 h of work");
     expect(cueLine({ kind: "milestone", sessionId: "s", milestone: "compactions", value: 2 }).text).toBe("2nd compaction, kopi lagi");
+  });
+
+  test("the list puts sessions waiting on you first, longest waiting on top, the rest in arrival order", () => {
+    const s = (id: string, startedAt: number, since?: number) =>
+      ({ id, startedAt, need: since === undefined ? null : { kind: "permission", since } }) as unknown as PublicSession;
+    const order = orderSessions([s("a", 1), s("b", 2, 50), s("c", 3), s("d", 4, 20)]).map((x) => x.id);
+    expect(order).toEqual(["d", "b", "a", "c"]);
   });
 
   test("ages use English units", () => {
