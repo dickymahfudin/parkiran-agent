@@ -176,10 +176,12 @@ export function Scene() {
       <SceneClock />
       <DebugHandle />
       <DayNight />
-      <Suspense fallback={null}>
-        <Sky />
-        <Ready part="sky" />
-      </Suspense>
+      <AssetBoundary name="sky">
+        <Suspense fallback={null}>
+          <Sky />
+          <Ready part="sky" />
+        </Suspense>
+      </AssetBoundary>
       <AssetBoundary name="ground">
         <Suspense fallback={null}>
           <StaticMerge>

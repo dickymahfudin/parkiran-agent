@@ -219,3 +219,10 @@ h2 { font-size: 11px; margin: 0; color: var(--muted); text-transform: uppercase;
   .cue-panel { display: none; }
   .detail-panel { left: 12px; right: 12px; width: auto; top: auto; bottom: 64px; }
 }
+
+/* Whole-app crash screen (AppErrorBoundary): never a blank page. */
+.crash { position: fixed; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; padding: 24px; text-align: center; background: radial-gradient(ellipse at 50% 40%, #1b2230 0%, #0b0d12 70%); color: var(--text, #f2f4f8); font-family: inherit; }
+.crash-title { margin: 0; font-size: 20px; font-weight: 800; }
+.crash-detail { margin: 0 0 12px; max-width: 60ch; font-size: 13px; color: var(--muted, #a9b1c0); overflow-wrap: anywhere; }
+.crash-reload { padding: 8px 18px; border: 0; border-radius: 999px; background: #ff8a3d; color: #101318; font-weight: 700; cursor: pointer; }
+.crash-reload:focus-visible { outline: 2px solid #5cc8ff; outline-offset: 2px; }

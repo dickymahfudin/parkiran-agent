@@ -42,14 +42,16 @@ Homebrew), run `bun run install-hooks` again.
 ```bash
 bun run server               # API + WebSocket on 127.0.0.1:4747 (server:dev restarts on changes)
 bun run web                  # Vite dev server on http://127.0.0.1:4748 (hot reload)
-bun run simulate -- --list   # scripted sessions, no Claude needed
-bun run simulate -- --scenario=tour
+bun run simulate -- --list                 # scripted sessions, no Claude needed
+bun run simulate -- --port=4757 --scenario=tour   # against a test server (PARKIRAN_PORT=4757 bun run server)
 bun scripts/watch.ts --seconds=120   # prints live state changes and the HUD states seen
 bun test && bun run typecheck
 ```
 
 Simulator scenarios: `working`, `approve`, `deny`, `question`, `failure`, `compact`, `subagent`, `idle`, `end`,
-`six` (six busy sessions), `tour` (every state at once). Options: `--speed=2`, `--loop`, `--fresh`.
+`six` (six busy sessions), `tour` (every state at once). Options: `--speed=2`, `--loop`, `--fresh`. `--port=` is
+required and the simulator refuses the port in `.env` (your live lot, where fake sessions would sit for hours next to
+the real ones) unless you pass `--live`.
 
 ## Uninstall
 

@@ -277,10 +277,14 @@ export class Brain {
     this.target = target;
     this.targetChangedAt = now;
 
-    if (previous?.kind === "needs" && target.kind !== "needs" && this.posture === "standing") {
+    // Standing with the bubble, or on the way up (the standUp gesture always finishes and has already shown the
+    // bubble): close the episode with a reaction, which runs once the person is on their feet. Still seated (the
+    // need came and went between two frames) means nothing was shown yet, so nothing has to be undone.
+    const standingUp = this.step?.type === "clip" && this.step.clip === "standUp";
+    if (previous?.kind === "needs" && target.kind !== "needs" && (this.posture === "standing" || standingUp)) {
       const resolved = outcome && outcome.at > this.lastOutcomeAt ? outcome : null;
       if (resolved) this.lastOutcomeAt = resolved.at;
-      this.interrupt(this.exitNeeds(resolved?.kind ?? "denied", previous.need));
+      this.interrupt(this.exitNeeds(resolved?.kind ?? "denied", previous.need, target));
       return;
     }
     this.interrupt([]);
@@ -306,19 +310,26 @@ export class Brain {
     return { type: "clip", clip, duration, loop: false, ...extra };
   }
 
-  private exitNeeds(outcome: Outcome["kind"], need: NeedKind): Step[] {
-    const sitBack = this.sitBack();
+  /**
+   * How a "needs" episode ends, standing. Only a granted permission earns a light; a denial (or a turn that failed
+   * while waiting) gets a sigh; an answered question or input just sits back. The sit-down is skipped when the next
+   * target leads elsewhere (leaving, kopi), or the person would sit down only to stand up again.
+   */
+  private exitNeeds(outcome: Outcome["kind"], need: NeedKind, next: Target): Step[] {
+    const sitBack = next.kind === "seated" ? this.sitBack() : [];
+    const refused = outcome === "denied" || outcome === "failure";
+    const granted = need === "permission" && outcome === "approved";
     if (this.habit === "none") {
-      return [this.clipStep(outcome === "denied" ? "sigh" : "standIdle", outcome === "denied" ? 1.6 : 0.6, { props: { bubble: null } }), ...sitBack];
+      return [this.clipStep(refused ? "sigh" : "standIdle", refused ? 1.6 : 0.6, { props: { bubble: null } }), ...sitBack];
     }
-    if (outcome === "denied") {
+    if (refused) {
       return [
         this.clipStep("sigh", 1.6, { props: { bubble: null } }),
         this.clipStep("pocketCig", 1.1, { propsEnd: { cigarette: "none" } }),
         ...sitBack,
       ];
     }
-    if (need === "question") return [this.clipStep("standIdle", 0.6, { props: { bubble: null } }), ...sitBack];
+    if (!granted) return [this.clipStep("standIdle", 0.6, { props: { bubble: null } }), ...sitBack];
     // Approved: a vaper takes a long pull straight away (no lighter).
     if (this.habit === "vape") return [this.clipStep("drag", 1.5, { props: { bubble: null, cigarette: "lit" } }), ...sitBack];
     return [

@@ -1,6 +1,7 @@
 // Drives the server with scripted, realistic sessions (no real Claude needed).
-// Usage: bun run simulate [--scenario=tour|<name>] [--speed=1] [--loop] [--fresh] [--list]
-// Doze needs a short idle timeout on the server: PARKIRAN_IDLE_MINUTES=0.3 bun run server
+// Usage: bun run simulate -- --port=4757 [--scenario=tour|<name>] [--speed=1] [--loop] [--fresh] [--list]
+// The port must be given, and it refuses the port in .env (the live lot with your real sessions) unless --live is passed.
+// Doze needs a short idle timeout on the server: PARKIRAN_IDLE_MINUTES=0.3 PARKIRAN_PORT=4757 bun run server
 import { readFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { DEFAULT_PORT, parseEnvFile } from "../shared/src/env.ts";
@@ -16,11 +17,29 @@ const args = new Map(
 const speed = Number(args.get("speed") ?? 1);
 const loop = args.has("loop");
 const fresh = args.has("fresh");
+if (!Number.isFinite(speed) || speed <= 0) {
+  console.error(`--speed must be a positive number, got "${args.get("speed")}"`);
+  process.exit(1);
+}
 
 const env = parseEnvFile(readFileSync(join(REPO_ROOT, ".env"), "utf8"));
 const token = process.env.PARKIRAN_TOKEN ?? env.PARKIRAN_TOKEN;
-const port = Number(process.env.PARKIRAN_PORT ?? env.PARKIRAN_PORT ?? DEFAULT_PORT);
 if (!token) throw new Error("PARKIRAN_TOKEN missing in .env (run `bun run install-hooks`)");
+
+/** The port the hooks post to: the live lot. Simulated sessions there sit next to your real ones for hours. */
+const livePort = Number(env.PARKIRAN_PORT ?? DEFAULT_PORT);
+const portArg = args.get("port") ?? process.env.PARKIRAN_SIM_PORT;
+const port = Number(portArg);
+if (!args.has("list")) {
+  if (portArg === undefined || !Number.isInteger(port) || port < 1 || port > 65535) {
+    console.error(`--port=<test server port> is required (e.g. --port=4757; the live lot is on ${livePort})`);
+    process.exit(1);
+  }
+  if (port === livePort && !args.has("live")) {
+    console.error(`refusing to simulate against the live lot on 127.0.0.1:${port} (PARKIRAN_PORT in .env); pass --live if you mean it`);
+    process.exit(1);
+  }
+}
 
 const sleep = (ms: number) => Bun.sleep(Math.max(0, ms / speed));
 const jitter = (ms: number) => ms * (0.75 + Math.random() * 0.5);

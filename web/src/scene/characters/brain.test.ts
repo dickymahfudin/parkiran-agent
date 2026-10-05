@@ -102,6 +102,83 @@ describe("Brain", () => {
     expect(b.state.posture).toBe("seated");
   });
 
+  test("approved while still standing up: the bubble still clears, the cigarette gets lit, back to work", () => {
+    const b = seatedBrain();
+    b.setTarget({ kind: "needs", need: "permission" }, null, 1);
+    // The server batches events, so an answer can land inside the 1 s stand-up gesture.
+    runFor(b, 0.5);
+    b.setTarget(WORK, { kind: "approved", at: 2 }, 2);
+    const { clips, last } = runFor(b, 12);
+    expect(clips.has("standUp") && clips.has("lightUp") && clips.has("sitDown")).toBe(true);
+    expect(last.props).toMatchObject({ bubble: null, cigarette: "lit" });
+    expect(last.clip).toBe("type");
+  });
+
+  test("a need that comes and goes between two frames leaves no trace", () => {
+    const b = seatedBrain();
+    b.setTarget({ kind: "needs", need: "permission" }, null, 1);
+    b.setTarget(WORK, { kind: "approved", at: 2 }, 2);
+    const { clips, last } = runFor(b, 6);
+    expect(clips.has("standUp") || clips.has("lightUp")).toBe(false);
+    expect(last.props.bubble).toBeNull();
+    expect(last.clip).toBe("type");
+  });
+
+  test("input answered: no lighter, sits back down with the bubble gone", () => {
+    const b = seatedBrain();
+    b.setTarget({ kind: "needs", need: "input" }, null, 1);
+    runFor(b, 5);
+    b.setTarget(WORK, { kind: "answered", at: 2 }, 2);
+    const { clips, last } = runFor(b, 8);
+    expect(clips.has("lightUp") || clips.has("drag")).toBe(false);
+    expect(clips.has("sitDown")).toBe(true);
+    expect(last.props).toMatchObject({ bubble: null });
+    expect(b.state.posture).toBe("seated");
+  });
+
+  test("the turn fails while waiting: a sigh, not a light", () => {
+    const b = seatedBrain();
+    b.setTarget({ kind: "needs", need: "permission" }, null, 1);
+    runFor(b, 5);
+    b.setTarget({ kind: "seated", activity: "idle" }, { kind: "failure", at: 2 }, 2);
+    let sat = false;
+    let litBeforeSitting = false;
+    const { clips } = runFor(b, 8, (f) => {
+      sat ||= f.clip === "sitDown";
+      if (!sat && f.clip === "lightUp") litBeforeSitting = true;
+    });
+    expect(clips.has("sigh") && clips.has("pocketCig")).toBe(true);
+    // The idle smoke afterwards may light one; the exit itself must not.
+    expect(litBeforeSitting).toBe(false);
+    expect(b.state.posture).toBe("seated");
+  });
+
+  test("leaving while waiting for a light: no detour back to the seat", () => {
+    const b = seatedBrain();
+    b.setTarget({ kind: "needs", need: "permission" }, null, 1);
+    runFor(b, 5);
+    b.setTarget({ kind: "gone" }, { kind: "denied", at: 2 }, 2);
+    const { clips } = runFor(b, 30);
+    expect(clips.has("sigh")).toBe(true);
+    expect(clips.has("sitDown")).toBe(false);
+    expect(b.done).toBe(true);
+  });
+
+  test("compaction while waiting: walks to the warung without sitting down first", () => {
+    const b = seatedBrain();
+    b.setTarget({ kind: "needs", need: "permission" }, null, 1);
+    runFor(b, 5);
+    b.setTarget({ kind: "warung" }, { kind: "denied", at: 2 }, 2);
+    let satBeforeBuying = false;
+    let bought = false;
+    runFor(b, 30, (f) => {
+      bought ||= f.clip === "buy";
+      if (!bought && f.clip === "sitDown") satBeforeBuying = true;
+    });
+    expect(bought).toBe(true);
+    expect(satBeforeBuying).toBe(false);
+  });
+
   test("compaction, no warung stool free: buys kopi at the window, drinks it back on its own seat", () => {
     const b = seatedBrain();
     b.setTarget({ kind: "warung" }, null, 1);

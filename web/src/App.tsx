@@ -1,4 +1,5 @@
 import { useEffect } from "react";
+import { AppErrorBoundary } from "./AppErrorBoundary.tsx";
 import { sound } from "./audio/sound.ts";
 import { Hud } from "./hud/Hud.tsx";
 import { connect } from "./net/connection.ts";
@@ -41,9 +42,11 @@ export function App() {
     );
   }
   return (
-    <div className={`app${compact ? " compact" : ""}${cinematic ? " cinematic" : ""}`}>
-      <Scene />
-      <Hud />
-    </div>
+    <AppErrorBoundary>
+      <div className={`app${compact ? " compact" : ""}${cinematic ? " cinematic" : ""}`}>
+        <Scene />
+        <Hud />
+      </div>
+    </AppErrorBoundary>
   );
 }

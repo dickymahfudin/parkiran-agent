@@ -7,8 +7,21 @@ const MIN_RETRY_MS = 500;
 const MAX_RETRY_MS = 8000;
 
 function wsUrl(): string {
-  if (import.meta.env.DEV) return `ws://${location.hostname}:${__PARKIRAN_SERVER_PORT__}/ws`;
-  return `${location.protocol === "https:" ? "wss" : "ws"}://${location.host}/ws`;
+  // Typed structurally: this module is also type-checked by the root config (no DOM lib) through the store tests.
+  const loc = (globalThis as unknown as { location: { hostname: string; host: string; protocol: string } }).location;
+  if (import.meta.env.DEV) return `ws://${loc.hostname}:${__PARKIRAN_SERVER_PORT__}/ws`;
+  return `${loc.protocol === "https:" ? "wss" : "ws"}://${loc.host}/ws`;
+}
+
+const KNOWN_TYPES: ReadonlySet<string> = new Set<ServerMessage["type"]>(["hello", "sessions", "cues", "usage"]);
+
+/** Shape check before the store sees a frame: an unknown type is reported in the HUD instead of applied. */
+export function parseServerMessage(value: unknown): ServerMessage {
+  if (typeof value !== "object" || value === null || Array.isArray(value)) throw new Error("not an object");
+  const msg = value as { type?: unknown; serverTime?: unknown };
+  if (typeof msg.type !== "string" || !KNOWN_TYPES.has(msg.type)) throw new Error(`unknown message type ${JSON.stringify(msg.type)}`);
+  if (typeof msg.serverTime !== "number" || !Number.isFinite(msg.serverTime)) throw new Error("missing serverTime");
+  return value as ServerMessage;
 }
 
 /** Keeps one WebSocket to the server alive with backoff; every failure is surfaced in the HUD. */
@@ -28,7 +41,7 @@ export function connect(): () => void {
     };
     ws.onmessage = (ev) => {
       try {
-        apply(JSON.parse(String(ev.data)) as ServerMessage);
+        apply(parseServerMessage(JSON.parse(String(ev.data))));
       } catch (err) {
         setConnection("open", `bad message from server: ${err instanceof Error ? err.message : String(err)}`);
       }

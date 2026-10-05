@@ -8,7 +8,7 @@ import { disposeSkinned } from "../characters/dispose.ts";
 import { attach, buildRig, useCharacterAsset } from "../characters/Person.tsx";
 import { envState } from "../env/envState.ts";
 import { timeControl } from "../timeControl.ts";
-import { canvasTexture } from "./assets.tsx";
+import { AssetBoundary, canvasTexture } from "./assets.tsx";
 import { StaticMerge } from "./StaticMerge.tsx";
 import { idleVehicle, LANES, laneX, stepTraffic, tickSpawner, type Spawner, type Vehicle } from "./traffic.ts";
 import { Car, MAT, Scooter } from "./Vehicles.tsx";
@@ -507,9 +507,11 @@ export function Ambient() {
   return (
     <group>
       <Traffic cars={road.cars} />
-      <Suspense fallback={null}>
-        <ScooterTraffic scooters={road.scooters} />
-      </Suspense>
+      <AssetBoundary name="riders">
+        <Suspense fallback={null}>
+          <ScooterTraffic scooters={road.scooters} />
+        </Suspense>
+      </AssetBoundary>
       <Cat />
       <Leaves />
     </group>

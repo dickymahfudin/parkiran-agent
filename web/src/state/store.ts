@@ -20,7 +20,12 @@ export type CameraMode = "orbit" | "cinematic";
 export const SCENE_PARTS = ["sky", "ground", "walls", "warung", "furniture", "vehicles", "characters"] as const;
 export type ScenePart = (typeof SCENE_PARTS)[number];
 
-const params = new URLSearchParams(location.search);
+export function isScenePart(value: string): value is ScenePart {
+  return (SCENE_PARTS as readonly string[]).includes(value);
+}
+
+// No `location` outside a browser (unit tests run under Bun without the DOM lib).
+const params = new URLSearchParams((globalThis as { location?: { search: string } }).location?.search ?? "");
 
 /** Per-viewer preferences; storage can be unavailable (private mode), so failures fall back to defaults. */
 function pref(key: string, fallback: boolean): boolean {
@@ -156,6 +161,10 @@ export const useApp = create<AppState>((set) => ({
         }
         case "usage":
           return { clockOffset, usage: msg.usage };
+        default:
+          // A message type this build does not know (server newer than the cached page): keep the state. Returning
+          // nothing here would make zustand replace the whole state with `undefined`.
+          return { clockOffset };
       }
     }),
 

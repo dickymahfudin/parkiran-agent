@@ -3,7 +3,7 @@ import { useLoader, useThree } from "@react-three/fiber";
 import { Component, useEffect, useMemo, type ReactNode } from "react";
 import * as THREE from "three";
 import { KTX2Loader } from "three/examples/jsm/loaders/KTX2Loader.js";
-import { useApp, type ScenePart } from "../../state/store.ts";
+import { isScenePart, useApp, type ScenePart } from "../../state/store.ts";
 
 const BASIS_PATH = "/basis/";
 let ktx2Loader: KTX2Loader | null = null;
@@ -91,14 +91,19 @@ export function pbrMaterial(set: PbrSet, extra: THREE.MeshStandardMaterialParame
 }
 
 /** Surfaces asset failures in the HUD instead of silently dropping part of the scene. */
-export class AssetBoundary extends Component<{ name: ScenePart; children: ReactNode }, { failed: boolean }> {
+/**
+ * Keeps one failing part (a missing model, a texture that will not decode) from unmounting the whole scene: the part
+ * disappears, the HUD shows the error. A `name` that is a loading part also counts as arrived, so the loading screen
+ * lifts.
+ */
+export class AssetBoundary extends Component<{ name: ScenePart | string; children: ReactNode }, { failed: boolean }> {
   override state = { failed: false };
   static getDerivedStateFromError(): { failed: boolean } {
     return { failed: true };
   }
   override componentDidCatch(error: unknown): void {
     useApp.getState().reportAssetError(`${this.props.name}: ${error instanceof Error ? error.message : String(error)}`);
-    useApp.getState().markReady(this.props.name);
+    if (isScenePart(this.props.name)) useApp.getState().markReady(this.props.name);
   }
   override render(): ReactNode {
     return this.state.failed ? null : this.props.children;

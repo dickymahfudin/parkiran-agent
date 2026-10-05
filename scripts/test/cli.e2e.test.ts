@@ -62,3 +62,41 @@ describe("install-hooks / uninstall-hooks CLI", () => {
     expect(readFileSync(settings).equals(original)).toBe(true);
   });
 });
+
+describe("simulate CLI", () => {
+  const simulate = async (...flags: string[]) => {
+    const proc = Bun.spawn([process.execPath, join(SCRIPTS, "simulate.ts"), ...flags], {
+      stdout: "pipe",
+      stderr: "pipe",
+      env: { ...process.env, PARKIRAN_PORT: undefined, PARKIRAN_SIM_PORT: undefined },
+    });
+    const [code, out, err] = await Promise.all([proc.exited, new Response(proc.stdout).text(), new Response(proc.stderr).text()]);
+    return { code, out, err };
+  };
+
+  test("refuses to run without a port, and never falls back to the live lot", async () => {
+    const r = await simulate("--scenario=working");
+    expect(r.code).toBe(1);
+    expect(r.err).toContain("--port=");
+    expect(r.out).not.toContain("simulating");
+  });
+
+  test("refuses the live port unless --live is passed", async () => {
+    const r = await simulate("--scenario=working", "--port=4747");
+    expect(r.code).toBe(1);
+    expect(r.err).toContain("live lot");
+    expect(r.out).not.toContain("simulating");
+  });
+
+  test("rejects a zero or negative speed", async () => {
+    const r = await simulate("--scenario=working", "--port=4757", "--speed=0");
+    expect(r.code).toBe(1);
+    expect(r.err).toContain("--speed");
+  });
+
+  test("--list needs no port", async () => {
+    const r = await simulate("--list");
+    expect(r.code).toBe(0);
+    expect(r.out).toContain("tour");
+  });
+});
