@@ -240,9 +240,15 @@ export class Brain {
     this.blend = 1;
   }
 
+  /** A new seat (or standing spot) from the server. Someone already seated stands up and walks over; nobody slides. */
   setHome(home: Home): void {
-    if (this.perch === this.home) this.perch = home;
+    const wasHome = this.perch === this.home;
     this.home = home;
+    if (!wasHome) return;
+    // Seated: keep perching on the old seat (its height, its spot) until plan() stands the person up and walks them
+    // home; moving `perch` here would lift the body to the new seat's height while it still sits on the old one.
+    if (this.posture !== "seated") this.perch = home;
+    this.interrupt([]);
   }
 
   /** The warung stool this person may drink their coffee on; a change re-plans a coffee break under way. */

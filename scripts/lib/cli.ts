@@ -1,6 +1,19 @@
-import { existsSync, lstatSync, mkdirSync, readFileSync, realpathSync, renameSync, rmSync, statSync, writeFileSync } from "node:fs";
+import { createHash } from "node:crypto";
+import {
+  chmodSync,
+  existsSync,
+  lstatSync,
+  mkdirSync,
+  readFileSync,
+  realpathSync,
+  renameSync,
+  rmSync,
+  statSync,
+  writeFileSync,
+} from "node:fs";
 import { homedir } from "node:os";
 import { dirname, join, resolve } from "node:path";
+import { writeBackup } from "./backup.ts";
 import type { InstallManifest } from "./settings-hooks.ts";
 
 export const REPO_ROOT = resolve(import.meta.dir, "..", "..");
@@ -65,22 +78,64 @@ export function atomicWrite(path: string, text: string): void {
 
 export interface StoredManifest extends InstallManifest {
   createdFile: boolean;
+  /** sha256 of the settings text before the first install ("" when install created the file). */
+  originalSha256?: string;
+  /** sha256 of the settings text install wrote last. */
+  installedSha256?: string;
 }
 
-export function readManifest(settingsPath: string): StoredManifest | null {
+export function sha256Text(text: string): string {
+  return createHash("sha256").update(text).digest("hex");
+}
+
+export interface ManifestRead {
+  manifest: StoredManifest | null;
+  /** Why there is no usable manifest (missing, malformed, written for another settings file). */
+  problem: string | null;
+}
+
+/** Never throws: a lost manifest must not stop uninstall, it only makes it more conservative. */
+export function readManifest(settingsPath: string): ManifestRead {
   const text = readTextIfExists(MANIFEST_PATH);
-  if (text === null) return null;
-  const parsed: unknown = JSON.parse(text);
-  if (typeof parsed !== "object" || parsed === null) fail(`${MANIFEST_PATH} is malformed`);
-  const m = parsed as Partial<StoredManifest>;
-  if (typeof m.settingsPath !== "string" || !Array.isArray(m.createdPaths)) fail(`${MANIFEST_PATH} is malformed`);
-  if (m.settingsPath !== settingsPath) return null;
-  return { settingsPath: m.settingsPath, createdPaths: m.createdPaths.map(String), createdFile: m.createdFile === true };
+  if (text === null) return { manifest: null, problem: `${MANIFEST_PATH} is missing` };
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(text);
+  } catch (err) {
+    return { manifest: null, problem: `${MANIFEST_PATH} is malformed: ${err instanceof Error ? err.message : String(err)}` };
+  }
+  const m = (typeof parsed === "object" && parsed !== null ? parsed : {}) as Partial<StoredManifest>;
+  if (typeof m.settingsPath !== "string" || !Array.isArray(m.createdPaths)) {
+    return { manifest: null, problem: `${MANIFEST_PATH} is malformed: expected settingsPath and createdPaths` };
+  }
+  if (m.settingsPath !== settingsPath) {
+    return { manifest: null, problem: `${MANIFEST_PATH} was written for ${m.settingsPath}, not ${settingsPath}` };
+  }
+  const manifest: StoredManifest = {
+    settingsPath: m.settingsPath,
+    createdPaths: m.createdPaths.map(String),
+    createdFile: m.createdFile === true,
+  };
+  if (typeof m.originalSha256 === "string") manifest.originalSha256 = m.originalSha256;
+  if (typeof m.installedSha256 === "string") manifest.installedSha256 = m.installedSha256;
+  return { manifest, problem: null };
+}
+
+export function manifestDir(): string {
+  return dirname(MANIFEST_PATH);
 }
 
 export function writeManifest(manifest: StoredManifest): void {
-  mkdirSync(dirname(MANIFEST_PATH), { recursive: true, mode: 0o700 });
+  mkdirSync(manifestDir(), { recursive: true, mode: 0o700 });
+  chmodSync(manifestDir(), 0o700);
   writeFileSync(MANIFEST_PATH, `${JSON.stringify(manifest, null, 2)}\n`, { mode: 0o600 });
+}
+
+/** Copies the current settings text next to the manifest before it is overwritten or deleted. Returns the backup path. */
+export function backupSettings(text: string): string {
+  mkdirSync(manifestDir(), { recursive: true, mode: 0o700 });
+  chmodSync(manifestDir(), 0o700);
+  return writeBackup(manifestDir(), text);
 }
 
 export function removeManifest(): void {

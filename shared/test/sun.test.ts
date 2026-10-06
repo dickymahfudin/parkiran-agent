@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import SunCalc from "suncalc";
-import { applyTimeOverride, sunPosition } from "../src/sun.ts";
+import { applyTimeOverride, atLotClock, sunPosition } from "../src/sun.ts";
 
 const JAKARTA = { lat: -6.2, lon: 106.8 };
 // Jakarta is UTC+7 all year.
@@ -61,5 +61,26 @@ describe("applyTimeOverride", () => {
     expect([d.getHours(), d.getMinutes(), d.getSeconds(), d.getDate()]).toEqual([17, 30, 0, 9]);
     expect(applyTimeOverride(new Date(), "25:00")).toBeNull();
     expect(applyTimeOverride(new Date(), "7pm")).toBeNull();
+  });
+});
+
+describe("atLotClock", () => {
+  test("a viewer in the lot's own zone sees the sun as it is", () => {
+    const d = wib("2026-03-20T12:00:00");
+    expect(atLotClock(d, JAKARTA.lon, 7 * 60).getTime()).toBe(d.getTime());
+  });
+
+  test("a viewer three hours ahead at noon sees the lot at its own noon, not at 09:00", () => {
+    // 12:00 in Melbourne (UTC+10) is 09:00 in Jakarta: the lot would be lit for the morning.
+    const melbourneNoon = new Date("2026-03-20T12:00:00+10:00");
+    const raw = sunPosition(melbourneNoon, JAKARTA.lat, JAKARTA.lon);
+    const shifted = sunPosition(atLotClock(melbourneNoon, JAKARTA.lon, 10 * 60), JAKARTA.lat, JAKARTA.lon);
+    expect(raw.elevation).toBeLessThan(50);
+    expect(shifted.elevation).toBeGreaterThan(80);
+  });
+
+  test("a viewer behind the lot at night does not get daylight", () => {
+    const londonMidnight = new Date("2026-03-20T00:00:00+00:00");
+    expect(sunPosition(atLotClock(londonMidnight, JAKARTA.lon, 0), JAKARTA.lat, JAKARTA.lon).elevation).toBeLessThan(-30);
   });
 });

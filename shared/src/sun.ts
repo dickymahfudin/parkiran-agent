@@ -53,6 +53,17 @@ export function sunPosition(date: Date, lat: number, lon: number): SunPosition {
 }
 
 /**
+ * The lot's clock reads what the viewer's does: the sun over it is computed for the lot's local time equal to the
+ * viewer's wall-clock time. Shifts `date` by the difference between the viewer's UTC offset and the lot's (whole hours
+ * from its longitude), so a viewer in Melbourne at 12:00 sees the Jakarta lot at Jakarta's noon, not at 09:00.
+ * `viewerOffsetMin` is minutes east of UTC (the negative of `Date#getTimezoneOffset`).
+ */
+export function atLotClock(date: Date, lon: number, viewerOffsetMin: number = -date.getTimezoneOffset()): Date {
+  const lotOffsetMin = Math.round(lon / 15) * 60;
+  return new Date(date.getTime() + (viewerOffsetMin - lotOffsetMin) * 60_000);
+}
+
+/**
  * `HH:MM` override applied to today's local date (debug `?time=`). Returns null when malformed.
  */
 export function applyTimeOverride(base: Date, hhmm: string): Date | null {

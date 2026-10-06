@@ -1,8 +1,8 @@
 // The optimised web assets live in the repo as one archive (assets/parkiran-assets.tar.gz) and are extracted into
 // web/public on `bun install` (postinstall). Usage: bun scripts/assets/archive.ts pack|unpack
-import { createHash } from "node:crypto";
-import { copyFileSync, existsSync, mkdirSync, readFileSync, readdirSync, statSync, writeFileSync } from "node:fs";
+import { copyFileSync, existsSync, mkdirSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { join, relative, resolve } from "node:path";
+import { badEntries, parseTarListing, sha256Bytes, verifyFiles } from "./verify.ts";
 
 const ROOT = resolve(import.meta.dir, "..", "..");
 const PUBLIC = join(ROOT, "web", "public");
@@ -17,7 +17,7 @@ interface Manifest {
   files: Record<string, string>;
 }
 
-const sha256 = (buf: Uint8Array) => createHash("sha256").update(buf).digest("hex");
+const sha256 = sha256Bytes;
 
 function walk(dir: string): string[] {
   return readdirSync(dir).flatMap((name) => {
@@ -58,6 +58,17 @@ function copyBasis(): void {
   for (const f of ["basis_transcoder.js", "basis_transcoder.wasm"]) copyFileSync(join(src, f), join(out, f));
 }
 
+function extract(manifest: Manifest): number {
+  // Only regular files at our own relative paths under assets/, and only the ones the manifest knows, may be written.
+  const entries = parseTarListing(run(["tar", "-tzf", ARCHIVE]), run(["tar", "-tvzf", ARCHIVE]));
+  const bad = badEntries(entries, new Set(Object.keys(manifest.files)));
+  if (bad.length > 0) throw new Error(`refusing to extract: ${bad.slice(0, 3).join("; ")}${bad.length > 3 ? ` (+${bad.length - 3})` : ""}`);
+  rmSync(STAMP, { force: true });
+  mkdirSync(PUBLIC, { recursive: true });
+  run(["tar", "-xzf", ARCHIVE, "-C", PUBLIC]);
+  return entries.length;
+}
+
 function unpack(): void {
   if (!existsSync(ARCHIVE) || !existsSync(MANIFEST)) {
     console.warn("⚠ assets/parkiran-assets.tar.gz not found: the scene will report missing assets. Rebuild with `bun run assets`.");
@@ -68,15 +79,21 @@ function unpack(): void {
   const digest = sha256(archive);
   if (digest !== manifest.archiveSha256) throw new Error("asset archive checksum does not match assets/parkiran-assets.json");
   copyBasis();
-  if (existsSync(STAMP) && readFileSync(STAMP, "utf8").trim() === digest) return;
-  // Only our own relative paths under assets/ may be written.
-  const entries = run(["tar", "-tzf", ARCHIVE]).split("\n").filter(Boolean);
-  const bad = entries.filter((e) => !e.startsWith("assets/") || e.split("/").includes("..") || e.startsWith("/"));
-  if (bad.length > 0) throw new Error(`refusing to extract unexpected paths: ${bad.slice(0, 3).join(", ")}`);
-  mkdirSync(PUBLIC, { recursive: true });
-  run(["tar", "-xzf", ARCHIVE, "-C", PUBLIC]);
+  // The stamp is only a hint: the files themselves are checked, and a bad tree is extracted again (once) before giving up.
+  const stampHit = existsSync(STAMP) && readFileSync(STAMP, "utf8").trim() === digest;
+  let problems = stampHit ? verifyFiles(PUBLIC, manifest.files) : ["not extracted yet"];
+  let extracted = 0;
+  while (problems.length > 0 && extracted < 2) {
+    if (extracted > 0 || stampHit) console.warn(`⚠ ${problems.length} asset file(s) missing or changed, extracting again: ${problems[0]}`);
+    extracted++;
+    const count = extract(manifest);
+    problems = verifyFiles(PUBLIC, manifest.files);
+    if (problems.length === 0) console.log(`extracted ${count} asset files into web/public/assets`);
+  }
+  if (problems.length > 0) {
+    throw new Error(`asset files do not match assets/parkiran-assets.json after re-extracting: ${problems.slice(0, 3).join("; ")}`);
+  }
   writeFileSync(STAMP, digest);
-  console.log(`extracted ${entries.length} asset files into web/public/assets`);
 }
 
 const cmd = process.argv[2];

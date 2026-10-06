@@ -23,8 +23,8 @@ export interface TextFormat {
   trailingNewline: boolean;
 }
 
-type Json = null | boolean | number | string | Json[] | { [key: string]: Json };
-type JsonObject = { [key: string]: Json };
+export type Json = null | boolean | number | string | Json[] | { [key: string]: Json };
+export type JsonObject = { [key: string]: Json };
 
 export class SettingsFormatError extends Error {}
 
@@ -69,6 +69,21 @@ export function isOurHandler(handler: unknown): boolean {
 
 export function isOurStatusLine(value: unknown): boolean {
   return isObject(value) && typeof value.command === "string" && value.command.includes(RELAY_MARKER);
+}
+
+/** Every Parkiran handler in the file, with the event it is registered under. */
+export function listOurHandlers(settings: JsonObject): { event: string; handler: JsonObject }[] {
+  const hooks = hooksObject(settings);
+  if (!hooks) return [];
+  const out: { event: string; handler: JsonObject }[] = [];
+  for (const [event, groups] of Object.entries(hooks)) {
+    if (!Array.isArray(groups)) continue;
+    for (const group of groups) {
+      if (!isObject(group) || !Array.isArray(group.hooks)) continue;
+      for (const handler of group.hooks) if (isOurHandler(handler)) out.push({ event, handler: handler as JsonObject });
+    }
+  }
+  return out;
 }
 
 function shellQuote(arg: string): string {
@@ -176,6 +191,8 @@ export function addOurHooks(
 
 export interface InstallPlan {
   newText: string;
+  /** The file with any previous Parkiran handlers removed: what uninstall is expected to restore. */
+  pristineText: string;
   createdPaths: string[];
   canonical: boolean;
   /** uninstall(newText) reproduces the pre-install text exactly. */
@@ -197,6 +214,7 @@ export function planInstall(text: string, target: HookTarget, previous: InstallM
   const roundTripExact = planUninstall(newText, installed.createdPaths).newText === pristineText;
   return {
     newText,
+    pristineText,
     createdPaths: installed.createdPaths,
     canonical,
     roundTripExact,

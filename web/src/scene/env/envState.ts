@@ -1,5 +1,5 @@
 import * as THREE from "three";
-import { applyTimeOverride, sunPosition } from "../../../../shared/src/sun.ts";
+import { applyTimeOverride, atLotClock, sunPosition } from "../../../../shared/src/sun.ts";
 import { useApp } from "../../state/store.ts";
 import { lightingFor, type Lighting } from "./dayNight.ts";
 import { SceneTimeEase } from "./timeOfDay.ts";
@@ -33,7 +33,10 @@ export function updateEnvState(): Lighting {
   // A new time of day (preset, auto, dev input) eases the sun round the clock instead of jumping.
   const date = new Date(timeEase.step(sceneDate(new Date(wall)).getTime(), useApp.getState().timeOverride ?? "auto", wall));
   const cfg = useApp.getState().config;
-  const sun = sunPosition(date, cfg?.lat ?? DEFAULT_LAT, cfg?.lon ?? DEFAULT_LON);
+  const lon = cfg?.lon ?? DEFAULT_LON;
+  // Everything else in the scene (presets, Pak Joko's nap, the food carts, the toolbar clock) reads the local hour, so
+  // the sun is computed for that same hour at the lot: no mismatch when the viewer's time zone is not the lot's.
+  const sun = sunPosition(atLotClock(date, lon), cfg?.lat ?? DEFAULT_LAT, lon);
   const lighting = lightingFor(sun);
   envState.date = date;
   envState.lighting = lighting;

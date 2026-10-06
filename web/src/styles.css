@@ -77,15 +77,20 @@ h2 { font-size: 11px; margin: 0; color: var(--muted); text-transform: uppercase;
 .empty-title { color: var(--text); font-weight: 700; font-size: 14px; }
 .empty-hint { font-size: 11.5px; opacity: 0.85; }
 
+/* Read by screen readers only */
+.sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
+
 /* Waiting on the user */
 .attention { position: absolute; top: 16px; left: 50%; transform: translateX(-50%); display: flex; flex-direction: column; align-items: center; gap: 6px; pointer-events: none; max-width: min(520px, calc(100% - 780px)); min-width: 280px; }
-.attention-item { all: unset; pointer-events: auto; cursor: pointer; display: flex; align-items: center; gap: 10px; width: 100%; box-sizing: border-box; font-size: 13px; padding: 9px 14px 9px 10px; border-radius: 999px; color: #fff4ec; background: linear-gradient(180deg, rgba(255, 138, 61, 0.95), rgba(226, 98, 30, 0.95)); box-shadow: 0 10px 28px rgba(255, 110, 40, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.3); animation: attention-in 0.35s cubic-bezier(0.2, 0.9, 0.3, 1.3), attention-bob 2.4s ease-in-out 0.35s infinite; }
+/* Dark ink on the orange (≈8:1), like the chips: white on it was below 3:1. */
+.attention-item { all: unset; pointer-events: auto; cursor: pointer; display: flex; align-items: center; gap: 10px; width: 100%; box-sizing: border-box; font-size: 13px; padding: 9px 14px 9px 10px; border-radius: 999px; color: #101318; background: linear-gradient(180deg, rgba(255, 150, 80, 0.97), rgba(255, 128, 52, 0.97)); box-shadow: 0 10px 28px rgba(255, 110, 40, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.3); animation: attention-in 0.35s cubic-bezier(0.2, 0.9, 0.3, 1.3), attention-bob 2.4s ease-in-out 0.35s infinite; }
 .attention-item:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
 .attention-item.seen { background: rgba(40, 30, 24, 0.86); color: #ffd9c2; box-shadow: inset 0 0 0 1px rgba(255, 138, 61, 0.55); animation: none; backdrop-filter: blur(10px); }
 .attention-item > span:nth-child(2) { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.attention-icon { width: 26px; height: 26px; border-radius: 50%; display: grid; place-items: center; background: rgba(255, 255, 255, 0.22); font-size: 15px; flex: none; }
-.attention-tool { opacity: 0.8; }
-.attention-age { font-size: 11px; font-weight: 700; opacity: 0.85; }
+.attention-icon { width: 26px; height: 26px; border-radius: 50%; display: grid; place-items: center; background: rgba(255, 255, 255, 0.28); font-size: 15px; flex: none; }
+.attention-tool { opacity: 0.85; }
+.attention-age { font-size: 11px; font-weight: 700; }
+.attention-item.seen .attention-tool, .attention-item.seen .attention-age { opacity: 0.85; }
 .attention-more { font-size: 11px; color: var(--muted); background: var(--panel-bg); padding: 3px 10px; border-radius: 999px; }
 @keyframes attention-in { from { opacity: 0; transform: translateY(-12px) scale(0.96); } }
 @keyframes attention-bob { 50% { transform: translateY(2px); } }

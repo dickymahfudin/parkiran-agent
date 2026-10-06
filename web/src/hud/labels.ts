@@ -93,6 +93,8 @@ export interface CueLine {
   icon: IconName;
   text: string;
   mood: Mood;
+  /** The Indonesian part of `text`, if any, so the page can mark its language for screen readers. */
+  joke?: string;
 }
 
 /**
@@ -104,26 +106,29 @@ export function cueLine(cue: Cue, session?: Pick<PublicSession, "need">): CueLin
     case "arrived":
       return { icon: "arrived", text: "session started", mood: "idle" };
     case "needStarted":
-      if (cue.need === "permission") return { icon: "permission", text: "cari korek (permission)", mood: "needs" };
+      if (cue.need === "permission") return { icon: "permission", text: "cari korek (permission)", mood: "needs", joke: "cari korek" };
       return cue.need === "question" ? { icon: "question", text: "asked a question", mood: "needs" } : { icon: "input", text: "needs input", mood: "needs" };
     case "needReminder":
-      return { icon: "waiting", text: session?.need?.kind === "permission" ? "masih cari korek (still waiting)" : "still waiting", mood: "needs" };
+      if (session?.need?.kind === "permission") return { icon: "waiting", text: "masih cari korek (still waiting)", mood: "needs", joke: "masih cari korek" };
+      return { icon: "waiting", text: "still waiting", mood: "needs" };
     case "needResolved":
-      if (cue.outcome === "denied") return { icon: "denied", text: "batal ngerokok (denied)", mood: "trouble" };
-      return cue.outcome === "answered" ? { icon: "answered", text: "answered", mood: "working" } : { icon: "approved", text: "dikasih korek (approved)", mood: "working" };
+      if (cue.outcome === "denied") return { icon: "denied", text: "batal ngerokok (denied)", mood: "trouble", joke: "batal ngerokok" };
+      if (cue.outcome === "answered") return { icon: "answered", text: "answered", mood: "working" };
+      return { icon: "approved", text: "dikasih korek (approved)", mood: "working", joke: "dikasih korek" };
     case "failure":
       return { icon: "error", text: cue.source === "tool" ? "tool failed" : "turn failed", mood: "trouble" };
     case "turnDone":
       return { icon: "done", text: "turn done", mood: "idle" };
     case "compactStarted":
-      return { icon: "coffee", text: "compacting, ke warung", mood: "working" };
+      return { icon: "coffee", text: "compacting, ke warung", mood: "working", joke: "ke warung" };
     case "compactDone":
-      return { icon: "coffee", text: "compact done, bawa kopi", mood: "idle" };
+      return { icon: "coffee", text: "compact done, bawa kopi", mood: "idle", joke: "bawa kopi" };
     case "friendArrived":
       return { icon: "friendIn", text: "subagent joined", mood: "working" };
     case "friendLeft":
       return { icon: "friendOut", text: "subagent left", mood: "away" };
     case "milestone":
+      if (cue.milestone === "compactions") return { icon: "milestone", text: milestoneText(cue.milestone, cue.value), mood: "working", joke: "kopi lagi" };
       return { icon: "milestone", text: milestoneText(cue.milestone, cue.value), mood: "working" };
     case "dozeStarted":
       return { icon: "dozing", text: "dozed off", mood: "dozing" };

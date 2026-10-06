@@ -6,7 +6,7 @@ import { sessionName } from "../hud/labels.ts";
 import { useApp } from "../state/store.ts";
 import { NOTIFY_EVERY_MS, notificationTitle, shouldChime } from "./rules.ts";
 
-function systemNotify(s: PublicSession): void {
+function systemNotify(s: PublicSession, shown: Map<string, Notification>): void {
   if (typeof Notification === "undefined" || Notification.permission !== "granted") return;
   // Only when you are elsewhere; on the page the bubble and chime are enough.
   if (document.visibilityState === "visible" && document.hasFocus()) return;
@@ -17,6 +17,11 @@ function systemNotify(s: PublicSession): void {
     useApp.getState().select(s.id);
     n.close();
   };
+  n.onclose = () => {
+    if (shown.get(s.id) === n) shown.delete(s.id);
+  };
+  shown.get(s.id)?.close();
+  shown.set(s.id, n);
 }
 
 export async function requestNotificationPermission(): Promise<void> {
@@ -27,12 +32,21 @@ export async function requestNotificationPermission(): Promise<void> {
 export function startNotifier(): () => void {
   const lastChime = new Map<string, number>();
   const lastNotified = new Map<string, number>();
+  /** The system notification on screen per session, closed as soon as the need is handled or the session leaves. */
+  const shown = new Map<string, Notification>();
+  const forget = (id: string): void => {
+    lastChime.delete(id);
+    lastNotified.delete(id);
+    shown.get(id)?.close();
+    shown.delete(id);
+  };
   const timer = setInterval(() => {
     const st = useApp.getState();
     const now = Date.now();
+    for (const id of new Set([...lastChime.keys(), ...lastNotified.keys(), ...shown.keys()])) if (!st.sessions[id]) forget(id);
     for (const s of Object.values(st.sessions)) {
       if (!s.need) {
-        lastChime.delete(s.id);
+        forget(s.id);
         continue;
       }
       if (!shouldChime(s, st.acknowledged[s.id], lastChime.get(s.id), now + st.clockOffset)) continue;
@@ -41,9 +55,13 @@ export function startNotifier(): () => void {
       const notified = lastNotified.get(s.id);
       if (st.notificationsEnabled && (notified === undefined || now - notified >= NOTIFY_EVERY_MS)) {
         lastNotified.set(s.id, now);
-        systemNotify(s);
+        systemNotify(s, shown);
       }
     }
   }, 1000);
-  return () => clearInterval(timer);
+  return () => {
+    clearInterval(timer);
+    for (const n of shown.values()) n.close();
+    shown.clear();
+  };
 }

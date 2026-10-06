@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from "react";
 import type { PublicSession } from "../../../shared/src/protocol.ts";
 import { requestNotificationPermission } from "../notify/notifier.ts";
 import { lookFor } from "../scene/characters/identity.ts";
@@ -12,6 +12,7 @@ import {
   MOOD_NAME,
   NEED_ICON,
   cueLine,
+  type CueLine,
   type IconName,
   type StateLabel,
   formatAge,
@@ -149,7 +150,9 @@ function SessionList({ list, now, compact }: { list: PublicSession[]; now: numbe
 function EmptyLot() {
   return (
     <div className="empty">
-      <p className="empty-title">Parkiran sepi.</p>
+      <p className="empty-title" lang="id">
+        Parkiran sepi.
+      </p>
       <p>Start a Claude Code session and someone pulls in with a laptop.</p>
       <p className="empty-hint">
         Nothing showing up? Run <code>bun run install-hooks</code> once.
@@ -255,8 +258,9 @@ function Attention({ list, now }: { list: PublicSession[]; now: number }) {
   const twins = useApp((st) => st.twins);
   const waiting = list.filter((s) => s.need).sort((a, b) => a.need!.since - b.need!.since);
   if (waiting.length === 0) return null;
+  // Not a live region: the ages below change every second. NeedAnnouncer speaks each new need once.
   return (
-    <div className="attention" role="status" aria-live="polite">
+    <div className="attention">
       {waiting.slice(0, MAX_ATTENTION).map((s) => {
         const need = s.need!;
         const seen = acknowledged[s.id] === need.since;
@@ -269,11 +273,27 @@ function Attention({ list, now }: { list: PublicSession[]; now: number }) {
               <b>{s.project ? sessionName(s, twins) : "Claude Code"}</b> {NEED_PHRASE[need.kind]}
               {need.toolName && need.kind === "permission" && <span className="attention-tool"> · {formatToolName(need.toolName)}</span>}
             </span>
-            <span className="attention-age">{formatAge(now - need.since)}</span>
+            <span className="attention-age" aria-hidden="true">{formatAge(now - need.since)}</span>
           </button>
         );
       })}
       {waiting.length > MAX_ATTENTION && <span className="attention-more">+{waiting.length - MAX_ATTENTION} more</span>}
+    </div>
+  );
+}
+
+/** One sentence per new need, for screen readers; nothing else in the HUD is live (ages tick every second). */
+function NeedAnnouncer({ list }: { list: PublicSession[] }) {
+  const twins = useApp((st) => st.twins);
+  const latest = list.filter((s) => s.need).sort((a, b) => b.need!.since - a.need!.since)[0];
+  const key = latest ? `${latest.id}:${latest.need!.since}` : "";
+  const [said, setSaid] = useState({ key: "", text: "" });
+  useEffect(() => {
+    if (key && key !== said.key && latest) setSaid({ key, text: `${latest.project ? sessionName(latest, twins) : "Claude Code"} ${NEED_PHRASE[latest.need!.kind]}` });
+  }, [key, said.key, latest, twins]);
+  return (
+    <div className="sr-only" role="status" aria-live="polite">
+      {said.text}
     </div>
   );
 }
@@ -293,6 +313,8 @@ const TIME_OPTIONS: readonly { mode: TimeMode; label: string; hint: string }[] =
 function TimeControl({ override }: { override: string | null }) {
   const [open, setOpen] = useState(false);
   const root = useRef<HTMLDivElement>(null);
+  const clock = useRef<HTMLButtonElement>(null);
+  const menu = useRef<HTMLDivElement>(null);
   const mode = modeOf(override);
   const d = new Date(serverNow());
   const [h, m] = override ? override.split(":").map(Number) : [d.getHours(), d.getMinutes()];
@@ -300,27 +322,47 @@ function TimeControl({ override }: { override: string | null }) {
   const current = TIME_OPTIONS.find((o) => o.mode === mode);
   useEffect(() => {
     if (!open) return;
+    // Focus goes into the menu (on the current choice) and comes back to the clock when it closes.
+    menu.current?.querySelector<HTMLElement>('[aria-checked="true"]')?.focus();
     const away = (e: PointerEvent) => !root.current?.contains(e.target as Node) && setOpen(false);
     window.addEventListener("pointerdown", away);
     return () => window.removeEventListener("pointerdown", away);
   }, [open]);
+  const close = () => {
+    setOpen(false);
+    clock.current?.focus();
+  };
   const pick = (next: TimeMode) => {
     useApp.getState().setTimeMode(next);
-    setOpen(false);
+    close();
+  };
+  const moveFocus = (e: ReactKeyboardEvent) => {
+    const items = [...(menu.current?.querySelectorAll<HTMLElement>('[role="menuitemradio"]') ?? [])];
+    if (items.length === 0) return;
+    const at = items.indexOf(document.activeElement as HTMLElement);
+    const to = e.key === "ArrowDown" ? (at + 1) % items.length : e.key === "ArrowUp" ? (at - 1 + items.length) % items.length : e.key === "Home" ? 0 : items.length - 1;
+    e.preventDefault();
+    items[to]?.focus();
   };
   return (
     <div
       className="time-control"
       ref={root}
       onKeyDown={(e) => {
-        if (e.key === "Escape" && open) {
+        if (!open) return;
+        if (e.key === "Escape") {
           e.stopPropagation();
-          setOpen(false);
-        }
+          close();
+        } else if (e.key === "ArrowDown" || e.key === "ArrowUp" || e.key === "Home" || e.key === "End") moveFocus(e);
+      }}
+      onBlur={(e) => {
+        // Tabbing away closes the menu; focus is already elsewhere, so it stays there.
+        if (open && !root.current?.contains(e.relatedTarget as Node | null)) setOpen(false);
       }}
     >
       <button
         type="button"
+        ref={clock}
         className="scene-clock"
         aria-haspopup="menu"
         aria-expanded={open}
@@ -332,7 +374,7 @@ function TimeControl({ override }: { override: string | null }) {
         <span className="time-mode">{current?.label ?? "Custom"}</span>
       </button>
       {open && (
-        <div className="time-menu panel" role="menu" aria-label="Time of day">
+        <div className="time-menu panel" role="menu" aria-label="Time of day" ref={menu}>
           {TIME_OPTIONS.map((o) => (
             <button key={o.mode} type="button" role="menuitemradio" aria-checked={mode === o.mode} onClick={() => pick(o.mode)}>
               <Icon name={MODE_ICON[o.mode]} />
@@ -421,6 +463,19 @@ function Toolbar() {
   );
 }
 
+/** The line's text with its Indonesian part marked for screen readers. */
+function CueText({ line }: { line: CueLine }) {
+  const i = line.joke ? line.text.indexOf(line.joke) : -1;
+  if (!line.joke || i < 0) return <>{line.text}</>;
+  return (
+    <>
+      {line.text.slice(0, i)}
+      <span lang="id">{line.joke}</span>
+      {line.text.slice(i + line.joke.length)}
+    </>
+  );
+}
+
 type FeedFilter = "all" | "attention";
 const ATTENTION_MOODS = new Set(["needs", "trouble"]);
 
@@ -446,18 +501,26 @@ function EventFeed({ now }: { now: number }) {
         </div>
       </header>
       {lines.length === 0 ? (
-        <p className="feed-empty">{filter === "all" ? "Events show up here as sessions work." : "Nothing needs you. Santai dulu."}</p>
+        <p className="feed-empty">
+          {filter === "all" ? (
+            "Events show up here as sessions work."
+          ) : (
+            <>
+              Nothing needs you. <span lang="id">Santai dulu.</span>
+            </>
+          )}
+        </p>
       ) : (
-        <ol aria-live="polite">
+        <ol>
           {lines.map(({ e, line }) => (
             <li key={e.seq} className={`mood-${line.mood}`}>
               <span className="cue-icon" aria-hidden="true">
                 <Icon name={line.icon} />
               </span>
               <span className="cue-text">
-                <b>{sessions[e.cue.sessionId] ? sessionName(sessions[e.cue.sessionId]!, twins) : shortId(e.cue.sessionId)}</b> {line.text}
+                <b>{sessions[e.cue.sessionId] ? sessionName(sessions[e.cue.sessionId]!, twins) : shortId(e.cue.sessionId)}</b> <CueText line={line} />
               </span>
-              <span className="age">{formatAge(now - e.at)}</span>
+              <span className="age" aria-hidden="true">{formatAge(now - e.at)}</span>
             </li>
           ))}
         </ol>
@@ -478,14 +541,22 @@ function Loader() {
     const id = setTimeout(() => setTimedOut(true), LOADING_MAX_MS);
     return () => clearTimeout(id);
   }, []);
-  if (gone) return null;
   const done = timedOut || ready >= SCENE_PARTS.length;
+  useEffect(() => {
+    // With `prefers-reduced-motion` the fade is off and `transitionend` never fires: lift the cover on a timer too.
+    if (!done) return;
+    const id = setTimeout(() => setGone(true), 1200);
+    return () => clearTimeout(id);
+  }, [done]);
+  if (gone) return null;
   const progress = (ready / SCENE_PARTS.length) * 100;
   return (
     <div className={`loader${done ? " done" : ""}`} onTransitionEnd={(e) => done && e.target === e.currentTarget && setGone(true)}>
       <ParkingMark />
       <p className="loader-title">Parkiran Agent</p>
-      <p className="loader-sub">Ke kantor cabang…</p>
+      <p className="loader-sub" lang="id">
+        Ke kantor cabang…
+      </p>
       <div className="loader-bar" role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(progress)} aria-label="Loading the scene">
         <span style={{ width: `${Math.max(6, progress)}%` }} />
       </div>
@@ -506,13 +577,19 @@ export function Hud() {
   const list = Object.values(sessions).sort((a, b) => a.startedAt - b.startedAt);
   const selected = selectedId ? sessions[selectedId] : undefined;
 
+  // Closing the detail panel sends the focus back to the session's row, so keyboard users do not land on <body>.
+  const closeDetail = useCallback(() => {
+    const id = useApp.getState().selectedId;
+    select(null);
+    if (id) document.querySelector<HTMLElement>(`[data-session="${CSS.escape(id)}"]`)?.focus();
+  }, [select]);
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape" && useApp.getState().selectedId) select(null);
+      if (e.key === "Escape" && useApp.getState().selectedId) closeDetail();
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [select]);
+  }, [closeDetail]);
 
   return (
     <div className="hud">
@@ -546,8 +623,9 @@ export function Hud() {
         {list.length === 0 ? <EmptyLot /> : <SessionList list={list} now={now} compact={compact} />}
       </section>
       <Attention list={list} now={now} />
+      <NeedAnnouncer list={list} />
       <Toolbar />
-      {selected && !compact && <Detail s={selected} now={now} onClose={() => select(null)} />}
+      {selected && !compact && <Detail s={selected} now={now} onClose={closeDetail} />}
       {!compact && <EventFeed now={now} />}
       <Loader />
     </div>

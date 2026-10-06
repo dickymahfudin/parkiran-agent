@@ -1,4 +1,4 @@
-import { accessSync, constants, existsSync, realpathSync, writeFileSync } from "node:fs";
+import { accessSync, chmodSync, constants, existsSync, realpathSync, writeFileSync } from "node:fs";
 import { isAbsolute } from "node:path";
 import { unifiedDiff } from "./lib/diff.ts";
 import { applyEnvAdditions, planEnvAdditions } from "./lib/env-file.ts";
@@ -7,6 +7,7 @@ import {
   RELAY_PATH,
   STATUSLINE_PATH,
   atomicWrite,
+  backupSettings,
   color,
   colorDiff,
   confirm,
@@ -15,6 +16,7 @@ import {
   readTextIfExists,
   resolveWritePath,
   settingsPathFromArgs,
+  sha256Text,
   writeManifest,
 } from "./lib/cli.ts";
 import { SettingsFormatError, planInstall, type InstallPlan } from "./lib/settings-hooks.ts";
@@ -38,14 +40,15 @@ const settingsPath = settingsPathFromArgs(argv);
 const writePath = resolveWritePath(settingsPath);
 const originalText = readTextIfExists(writePath);
 const baseText = originalText ?? "{}\n";
-const manifest = readManifest(settingsPath);
+const { manifest } = readManifest(settingsPath);
 
 let plan: InstallPlan;
 try {
   plan = planInstall(
     baseText,
     { bunPath, relayPath: RELAY_PATH, ...(withStatusLine ? { statusLinePath: STATUSLINE_PATH } : {}) },
-    manifest,
+    // Without a manifest no container may be deleted, so a lost manifest can never cost the user a pre-existing key.
+    manifest ?? { settingsPath, createdPaths: [] },
   );
 } catch (err) {
   if (err instanceof SettingsFormatError) fail(err.message);
@@ -101,9 +104,20 @@ if (!confirm(plan.changed ? `Write these changes to ${settingsPath}?` : "Write t
 if (readTextIfExists(writePath) !== originalText) fail(`${settingsPath} changed while waiting for confirmation; re-run.`);
 
 if (envAdditions.length > 0) writeFileSync(ENV_PATH, applyEnvAdditions(envText, envAdditions), { mode: 0o600 });
+// The token must stay private even when .env pre-existed with a looser mode.
+if (existsSync(ENV_PATH)) chmodSync(ENV_PATH, 0o600);
 if (plan.changed) {
+  const createdFile = originalText === null || manifest?.createdFile === true;
+  // The manifest goes first: a crash between the two writes must never leave hooks installed without it.
+  writeManifest({
+    settingsPath,
+    createdPaths: plan.createdPaths,
+    createdFile,
+    originalSha256: manifest?.originalSha256 ?? sha256Text(createdFile ? "" : plan.pristineText),
+    installedSha256: sha256Text(plan.newText),
+  });
+  if (originalText !== null) console.log(color.dim(`  backup    ${backupSettings(originalText)}`));
   atomicWrite(writePath, plan.newText);
-  writeManifest({ settingsPath, createdPaths: plan.createdPaths, createdFile: originalText === null || manifest?.createdFile === true });
 }
 
 console.log(color.green("✓ Hooks installed. Claude Code reloads settings.json automatically; new events flow on the next hook."));

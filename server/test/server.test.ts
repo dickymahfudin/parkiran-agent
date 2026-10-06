@@ -135,6 +135,14 @@ describe("ReorderBuffer", () => {
 });
 
 describe("config", () => {
+  test("the static dir is resolved against the repo and loses its trailing slash", () => {
+    const env = { PARKIRAN_TOKEN: TOKEN, PARKIRAN_STATIC_DIR: "web/dist/" };
+    const dir = loadServerConfig(env, "/nonexistent/.env").staticDir!;
+    expect(dir.endsWith("/web/dist")).toBe(true);
+    expect(dir.startsWith("/")).toBe(true);
+    expect(loadServerConfig({ PARKIRAN_TOKEN: TOKEN, PARKIRAN_STATIC_DIR: "/srv/parkiran/" }, "/nonexistent/.env").staticDir).toBe("/srv/parkiran");
+  });
+
   test("requires a token and validates numbers", () => {
     expect(() => loadServerConfig({}, "/nonexistent/.env")).toThrow(ConfigError);
     expect(() => loadServerConfig({ PARKIRAN_TOKEN: TOKEN, PARKIRAN_LAT: "999" }, "/nonexistent/.env")).toThrow(ConfigError);
@@ -169,6 +177,10 @@ describe("static files (production build)", () => {
     expect(etag).toBeTruthy();
     const again = await at("/assets/models/bench.glb", { "if-none-match": etag! });
     expect(again.status).toBe(304);
+  });
+
+  test("a malformed percent-escape is a 400, not a crash", async () => {
+    expect((await at("/assets/%zz")).status).toBe(400);
   });
 
   test("a chunk from an older build is a 404, not the app page; app routes still get the page", async () => {

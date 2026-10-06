@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import type { PublicSession } from "../../../shared/src/protocol.ts";
+import type { Cue } from "../../../shared/src/session.ts";
 import { assignTwinNumbers, cueLine, formatAge, formatToolName, moodCounts, orderSessions, sessionName, stateLabel } from "./labels.ts";
 
 const session = (over: Partial<PublicSession>): PublicSession =>
@@ -11,6 +12,24 @@ describe("labels", () => {
     expect(cueLine({ kind: "leaving", sessionId: "s" }).text).toBe("session ended");
     expect(cueLine({ kind: "needResolved", sessionId: "s", outcome: "denied" }).text).toBe("batal ngerokok (denied)");
     expect(stateLabel(session({ need: { kind: "permission" } as PublicSession["need"] }), 0).text).toBe("permission");
+  });
+
+  test("every joke is marked as such, and is part of the line", () => {
+    const cues: Cue[] = [
+      { kind: "needStarted", sessionId: "s", need: "permission" },
+      { kind: "needResolved", sessionId: "s", outcome: "denied" },
+      { kind: "needResolved", sessionId: "s", outcome: "approved" },
+      { kind: "compactStarted", sessionId: "s" },
+      { kind: "compactDone", sessionId: "s" },
+      { kind: "milestone", sessionId: "s", milestone: "compactions", value: 2 },
+    ];
+    for (const cue of cues) {
+      const line = cueLine(cue);
+      expect(line.joke).toBeTruthy();
+      expect(line.text).toContain(line.joke!);
+    }
+    expect(cueLine({ kind: "needReminder", sessionId: "s" }, { need: { kind: "permission" } as PublicSession["need"] }).joke).toBe("masih cari korek");
+    expect(cueLine({ kind: "turnDone", sessionId: "s" }).joke).toBeUndefined();
   });
 
   test("states and events carry an icon instead of an emoji", () => {

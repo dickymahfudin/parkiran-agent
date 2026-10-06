@@ -59,7 +59,8 @@ the real ones) unless you pass `--live`.
 bun run uninstall-hooks      # shows the diff, asks, removes only Parkiran's handlers
 ```
 
-The file ends up byte for byte as it was before `install-hooks` (containers the installer created are removed too;
+Before every write or delete, the current `settings.json` is copied to `.parkiran/settings.json.<timestamp>.bak`
+(mode 600, the last 10 kept). The file ends up byte for byte as it was before `install-hooks` (containers the installer created are removed too;
 the manifest is in `.parkiran/hooks-install.json`). If the file is not in standard JSON formatting, install refuses
 unless you pass `--allow-reformat`. Both scripts accept `--dry-run` and `--settings=<path>`.
 
@@ -138,9 +139,11 @@ monitor, sound, notifications and the time of day (plus a free time input in dev
 every part of the scene has arrived. States and events use stroke icons (Lucide), no emoji. Plain facts read in English; the warung jokes stay ("cari korek", "batal
 ngerokok", "bawa kopi").
 
-**Notifications:** when a session needs you, a chime plays (and repeats every 25 s); if the page is not focused you
-also get a system notification such as "warung-app needs permission" with the branch. Clicking the character silences
-it; it never changes the real session. Sound starts after your first click on the page (browser rule).
+**Notifications:** when a session needs you, a chime plays (and repeats every 25 s). Turn on the bell in the toolbar
+once (the browser asks for permission then; the choice is remembered) and, when the page is not focused, you also
+get a system notification such as "warung-app needs permission" with the branch; it disappears as soon as the session
+is handled. Clicking the character silences the chime; it never changes the real session. Sound starts after your
+first click on the page (browser rule).
 
 URL options: `?time=21:00` (fixed scene time), `?compact`, `?cinematic`, `?stats` (frame-rate meter); in dev mode also
 `?cam=px,py,pz,tx,ty,tz`, `?cart=bakso|nasgor` (a cart right now) and `?gallery`.
@@ -152,7 +155,7 @@ URL options: `?time=21:00` (fixed scene time), `?compact`, `?cinematic`, `?stats
 | `PARKIRAN_TOKEN` | random | shared secret between relay and server (created by `install-hooks`) |
 | `PARKIRAN_PORT` | `4747` | server port (127.0.0.1 only) |
 | `PARKIRAN_WEB_PORT` | `4748` | Vite dev server port |
-| `PARKIRAN_LAT`, `PARKIRAN_LON` | `-6.2`, `106.8` | your location for the sun (Jakarta) |
+| `PARKIRAN_LAT`, `PARKIRAN_LON` | `-6.2`, `106.8` | where the lot is, for the sun (Jakarta). The lot's clock always reads your local time, wherever you watch from |
 | `PARKIRAN_IDLE_MINUTES` | `30` | idle time before a character dozes off |
 | `PARKIRAN_REAP_HOURS` | `12` | sessions without events disappear after this |
 | `PARKIRAN_ALLOWED_ORIGINS` | – | extra WebSocket origins, comma separated |
@@ -198,6 +201,8 @@ assets/   asset archive (+ raw downloads and Blender output, gitignored)
 
 ## Troubleshooting
 
+- **Not sure what is wrong:** `bun run doctor` checks `settings.json`, the pinned bun/relay paths, `.env`, the install
+  manifest, the server (`/api/health`) and the web build, one `ok`/`warn`/`fail` line each (exit 1 only on `fail`).
 - **Nobody shows up:** check the HUD shows *live*; send a prompt in Claude (sessions appear on their next event);
   `PARKIRAN_RELAY_DEBUG=1` in `.env` writes relay errors to `logs/`.
 - **"asset failed to load" in the HUD:** run `bun install` again (re-extracts the archive).

@@ -224,6 +224,10 @@ export function SmokeSystem({ sources }: { sources: Map<string, SmokeSource> }) 
       for (let i = 0; i < n; i++) each();
     };
 
+    // Sources come and go with the sessions; their fractional-puff carry must not outlive them.
+    if (carry.current.size > sources.size * 2 + 8) {
+      for (const key of carry.current.keys()) if (!sources.has(key.endsWith(":exhale") ? key.slice(0, -":exhale".length) : key)) carry.current.delete(key);
+    }
     for (const [id, src] of sources) {
       if (src.kind === "steam") {
         if (src.active) emit(id, KINDS[Kind.Steam].rate, () => spawn(Kind.Steam, src.world, 0, KINDS[Kind.Steam].rise, 0));

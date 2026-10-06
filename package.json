@@ -13,6 +13,7 @@
     "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p web/tsconfig.json --noEmit && tsc -p web/tsconfig.node.json --noEmit",
     "install-hooks": "bun scripts/install-hooks.ts",
     "uninstall-hooks": "bun scripts/uninstall-hooks.ts",
+    "doctor": "bun scripts/doctor.ts",
     "bench:relay": "bun scripts/bench-relay.ts",
     "server": "bun server/src/index.ts",
     "server:dev": "bun --watch server/src/index.ts",

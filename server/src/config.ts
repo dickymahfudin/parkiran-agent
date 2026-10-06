@@ -55,6 +55,7 @@ export function loadServerConfig(env: Record<string, string | undefined> = proce
       idleMs: num(get("PARKIRAN_IDLE_MINUTES"), 30, 0.05, 24 * 60, "PARKIRAN_IDLE_MINUTES") * 60_000,
       reapMs: num(get("PARKIRAN_REAP_HOURS"), 12, 0.01, 24 * 30, "PARKIRAN_REAP_HOURS") * 3_600_000,
     },
-    staticDir: get("PARKIRAN_STATIC_DIR") ?? join(REPO_ROOT, "web", "dist"),
+    // Relative to the repo, absolute as given; trailing slashes dropped.
+    staticDir: resolve(REPO_ROOT, get("PARKIRAN_STATIC_DIR") ?? join("web", "dist")),
   };
 }

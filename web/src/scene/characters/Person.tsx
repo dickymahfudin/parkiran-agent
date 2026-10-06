@@ -542,6 +542,9 @@ function PersonView({ brain, look, tag, friend, smoke, steam, onSelect, trackId 
     [mixer, rig],
   );
   useEffect(() => () => disposeSkinned(rig.object), [rig]);
+  // Materials made here (not by R3F from JSX) are ours to free.
+  useEffect(() => () => tipMat.dispose(), [tipMat]);
+  useEffect(() => () => ledMat.dispose(), [ledMat]);
   useEffect(() => {
     if (!trackId) return;
     characterRoots.set(trackId, root.current);

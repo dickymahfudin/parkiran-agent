@@ -121,7 +121,9 @@ export const useApp = create<AppState>((set) => ({
   compact: params.has("compact"),
   audioEnabled: pref("audio", true),
   audioUnlocked: false,
-  notificationsEnabled: pref("notifications", true),
+  // Off until the bell is turned on: the permission prompt then comes from that click, not from the first click
+  // anywhere on the page (which browsers treat as unprompted and may block for good).
+  notificationsEnabled: pref("notifications", false),
   sessionsCollapsed: pref("sessionsCollapsed", false),
   acknowledged: {},
 

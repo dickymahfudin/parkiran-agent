@@ -179,6 +179,24 @@ describe("Brain", () => {
     expect(satBeforeBuying).toBe(false);
   });
 
+  test("re-seated while sitting: stands up and walks to the new seat instead of sliding over", () => {
+    const b = seatedBrain();
+    const hoodSeat = SEAT_PLACES["hood-1"]!;
+    const hood: Home = { point: hoodSeat.approach, yaw: hoodSeat.yaw, node: hoodSeat.node, seat: { hip: hoodSeat.hip, style: hoodSeat.style } };
+    b.setHome(hood);
+    let stood = false;
+    let liftedOnBench = false;
+    const { clips, last } = runFor(b, 30, (f) => {
+      stood ||= f.clip === "standUp";
+      // Until on their feet, the body must keep the bench's height at the bench's spot.
+      if (!stood && f.sit === 1 && f.seatY !== seat.hip[1]) liftedOnBench = true;
+    });
+    expect(liftedOnBench).toBe(false);
+    expect(clips.has("standUp") && clips.has("walk") && clips.has("sitDown")).toBe(true);
+    expect(Math.hypot(last.x - hoodSeat.approach[0], last.z - hoodSeat.approach[1])).toBeLessThan(0.01);
+    expect(last).toMatchObject({ sit: 1, seatY: hoodSeat.hip[1], clip: "type" });
+  });
+
   test("compaction, no warung stool free: buys kopi at the window, drinks it back on its own seat", () => {
     const b = seatedBrain();
     b.setTarget({ kind: "warung" }, null, 1);

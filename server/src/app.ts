@@ -1,6 +1,6 @@
 import { timingSafeEqual } from "node:crypto";
 import { existsSync, statSync } from "node:fs";
-import { extname, join, normalize, sep } from "node:path";
+import { extname, join, normalize, resolve, sep } from "node:path";
 import type { ServerWebSocket } from "bun";
 import { parseIngestEvent } from "../../shared/src/events.ts";
 import type { ServerMessage } from "../../shared/src/protocol.ts";
@@ -29,6 +29,8 @@ const text = (status: number, body: string): Response =>
   new Response(body, { status, headers: { "content-type": "text/plain; charset=utf-8" } });
 
 export function createApp({ config, store, usage, log }: AppDeps) {
+  // Normalised once: a trailing slash in PARKIRAN_STATIC_DIR would otherwise fail the containment check below.
+  const staticRoot = config.staticDir === null ? null : resolve(config.staticDir);
   const send = (ws: ServerWebSocket<unknown>, msg: ServerMessage): void => {
     ws.send(JSON.stringify(msg));
   };
@@ -36,6 +38,8 @@ export function createApp({ config, store, usage, log }: AppDeps) {
   const server = Bun.serve({
     hostname: "127.0.0.1",
     port: config.port,
+    // Bun refuses bigger bodies before `req.text()` reads them; the content-length check below is the fast path.
+    maxRequestBodySize: MAX_BODY_BYTES,
     async fetch(req, srv) {
       const url = new URL(req.url);
       // DNS rebinding guard: only our own host names.
@@ -72,8 +76,8 @@ export function createApp({ config, store, usage, log }: AppDeps) {
           return Response.json({ ok: true, sessions: store.sessions().length });
         }
 
-        if (req.method === "GET" && config.staticDir && existsSync(config.staticDir)) {
-          return serveStatic(config.staticDir, url.pathname, req.headers.get("if-none-match"));
+        if (req.method === "GET" && staticRoot !== null && existsSync(staticRoot)) {
+          return serveStatic(staticRoot, url.pathname, req.headers.get("if-none-match"));
         }
         return text(404, "not found");
       } catch (err) {
@@ -126,7 +130,13 @@ const HASHED_BUILD_FILE = /^assets\/[^/]+-[A-Za-z0-9_-]{8}\.(?:js|css)$/;
  * instead of an old index.html asking for chunks the rebuild deleted.
  */
 function serveStatic(root: string, pathname: string, ifNoneMatch: string | null): Response {
-  const rel = normalize(decodeURIComponent(pathname)).replace(/^[/\\]+/, "");
+  let decoded: string;
+  try {
+    decoded = decodeURIComponent(pathname);
+  } catch {
+    return text(400, "bad path");
+  }
+  const rel = normalize(decoded).replace(/^[/\\]+/, "");
   const full = join(root, rel);
   if (!full.startsWith(root + sep) && full !== root) return text(403, "forbidden");
   if (existsSync(full) && statSync(full).isFile()) return fileResponse(full, HASHED_BUILD_FILE.test(rel), ifNoneMatch);

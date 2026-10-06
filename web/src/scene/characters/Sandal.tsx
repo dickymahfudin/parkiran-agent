@@ -1,6 +1,6 @@
 // Sandal jepit, Swallow style: a foot-shaped rubber sole (coloured underneath, white on top) and a Y strap from the toe
 // post. Geometry is built once per foot and shared by everyone; only the colour differs.
-import { useMemo } from "react";
+import { useEffect, useMemo } from "react";
 import * as THREE from "three";
 import { mergeGeometries } from "three/examples/jsm/utils/BufferGeometryUtils.js";
 
@@ -99,6 +99,7 @@ const WHITE_TOP = new THREE.MeshStandardMaterial({ color: "#eeede6", roughness: 
 export function Sandal({ side, color }: { side: FootSide; color: string }) {
   const g = geometryFor(side);
   const rubber = useMemo(() => new THREE.MeshStandardMaterial({ color, roughness: 0.6 }), [color]);
+  useEffect(() => () => rubber.dispose(), [rubber]);
   return (
     <>
       <mesh geometry={g.rubber} material={rubber} castShadow receiveShadow />
