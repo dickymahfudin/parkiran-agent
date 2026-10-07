@@ -79,7 +79,14 @@ describe("director", () => {
   test("people not (yet) in the lot are not filmed", () => {
     const need = { kind: "question", since: 0 } as PublicSession["need"];
     const sessions = () => ({ a: session("a", { need }) });
-    const { cuts } = run({ ...START, since: 0 }, 0, 10_000, sessions, () => [], (id) => id !== "a");
+    const { cuts } = run(
+      { ...START, since: 0 },
+      0,
+      10_000,
+      sessions,
+      () => [],
+      (id) => id !== "a",
+    );
     expect(cuts).toHaveLength(0);
   });
 });

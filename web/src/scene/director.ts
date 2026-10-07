@@ -59,7 +59,13 @@ function stillValid(shot: Shot, sessions: Readonly<Record<string, PublicSession>
  * always wins and is held until the need is handled. With nothing going on the camera rests on the overview and now
  * and then visits someone at work.
  */
-export function direct(prev: DirectorState, sessions: Readonly<Record<string, PublicSession>>, cues: readonly CueAt[], now: number, visible: (id: string) => boolean): DirectorState {
+export function direct(
+  prev: DirectorState,
+  sessions: Readonly<Record<string, PublicSession>>,
+  cues: readonly CueAt[],
+  now: number,
+  visible: (id: string) => boolean,
+): DirectorState {
   const held = now - prev.since;
   const valid = stillValid(prev.shot, sessions, visible);
   let seenSeq = prev.seenSeq;

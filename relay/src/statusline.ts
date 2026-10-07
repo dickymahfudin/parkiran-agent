@@ -20,8 +20,7 @@ function readWindow(value: unknown): UsageWindow | null {
 }
 
 export function extractUsage(raw: unknown): { fiveHour: UsageWindow | null; sevenDay: UsageWindow | null } {
-  const limits =
-    typeof raw === "object" && raw !== null ? (raw as Record<string, unknown>).rate_limits : undefined;
+  const limits = typeof raw === "object" && raw !== null ? (raw as Record<string, unknown>).rate_limits : undefined;
   const obj = typeof limits === "object" && limits !== null ? (limits as Record<string, unknown>) : {};
   return { fiveHour: readWindow(obj.five_hour), sevenDay: readWindow(obj.seven_day) };
 }
@@ -35,10 +34,7 @@ async function main(): Promise<void> {
   } catch {
     // shape log still records that we were called
   }
-  appendLog(
-    "statusline-probe.jsonl",
-    JSON.stringify({ at: new Date().toISOString(), shape: describeShape(raw), usage: extractUsage(raw) }),
-  );
+  appendLog("statusline-probe.jsonl", JSON.stringify({ at: new Date().toISOString(), shape: describeShape(raw), usage: extractUsage(raw) }));
 }
 
 if (import.meta.main) {

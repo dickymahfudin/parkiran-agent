@@ -3,34 +3,18 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { HOOK_EVENTS } from "../../shared/src/events.ts";
 import { unifiedDiff } from "../lib/diff.ts";
-import {
-  RELAY_MARKER,
-  SettingsFormatError,
-  isOurHandler,
-  parseSettings,
-  planInstall,
-  planUninstall,
-  type HookTarget,
-} from "../lib/settings-hooks.ts";
+import { RELAY_MARKER, SettingsFormatError, isOurHandler, parseSettings, planInstall, planUninstall, type HookTarget } from "../lib/settings-hooks.ts";
 
 const target: HookTarget = {
   bunPath: "/Users/example/.asdf/installs/bun/1.4.0/bin/bun",
   relayPath: "/Users/example/dev/parkiran-agent/relay/src/index.ts",
 };
 const fixture = (name: string): string => readFileSync(join(import.meta.dir, "fixtures", name), "utf8");
-const CANONICAL = [
-  "user-like.json",
-  "empty-object.json",
-  "no-hooks.json",
-  "four-space-empty-stop.json",
-  "tabs-no-trailing-newline.json",
-];
+const CANONICAL = ["user-like.json", "empty-object.json", "no-hooks.json", "four-space-empty-stop.json", "tabs-no-trailing-newline.json"];
 
 function ourGroups(text: string): Record<string, unknown[]> {
   const hooks = (parseSettings(text).hooks ?? {}) as Record<string, { hooks: unknown[] }[]>;
-  return Object.fromEntries(
-    Object.entries(hooks).map(([event, groups]) => [event, groups.flatMap((g) => g.hooks.filter(isOurHandler))]),
-  );
+  return Object.fromEntries(Object.entries(hooks).map(([event, groups]) => [event, groups.flatMap((g) => g.hooks.filter(isOurHandler))]));
 }
 
 describe("install + uninstall round trip", () => {
@@ -88,10 +72,14 @@ describe("install + uninstall round trip", () => {
 
   test("re-install after the repo moved replaces the old handlers", () => {
     const first = planInstall(fixture("user-like.json"), target, null);
-    const moved = planInstall(first.newText, { ...target, relayPath: "/new/place/relay/src/index.ts" }, {
-      settingsPath: "x",
-      createdPaths: first.createdPaths,
-    });
+    const moved = planInstall(
+      first.newText,
+      { ...target, relayPath: "/new/place/relay/src/index.ts" },
+      {
+        settingsPath: "x",
+        createdPaths: first.createdPaths,
+      },
+    );
     const groups = ourGroups(moved.newText);
     for (const event of HOOK_EVENTS) {
       expect(groups[event]).toHaveLength(1);

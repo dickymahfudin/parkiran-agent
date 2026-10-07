@@ -43,10 +43,7 @@ describe("session lifecycle", () => {
   });
 
   test("start → prompt → tools by kind → stop", () => {
-    const { world } = run([
-      ev("SessionStart", 1, { source: "startup" }),
-      ev("UserPromptSubmit", 2),
-    ]);
+    const { world } = run([ev("SessionStart", 1, { source: "startup" }), ev("UserPromptSubmit", 2)]);
     expect(session(world)).toMatchObject({ phase: "working", work: "think" });
     const kindsSeen: string[] = [];
     let w = world;
@@ -64,7 +61,7 @@ describe("session lifecycle", () => {
   });
 
   test("SessionEnd → leaving, friends leave, removed after the exit walk, seat freed", () => {
-    let { world, cues } = run([
+    const { world, cues } = run([
       ev("SessionStart", 1),
       ev("SubagentStart", 2, { agentId: "a1", agentType: "Explore" }),
       ev("SessionEnd", 3, { endReason: "other" }),
@@ -100,11 +97,7 @@ describe("session lifecycle", () => {
 });
 
 describe("needs me: permission (korek)", () => {
-  const ask = [
-    ev("UserPromptSubmit", 1),
-    ev("PreToolUse", 100, { toolName: "Bash", toolUseId: "t1" }),
-    ev("PermissionRequest", 180, { toolName: "Bash" }),
-  ];
+  const ask = [ev("UserPromptSubmit", 1), ev("PreToolUse", 100, { toolName: "Bash", toolUseId: "t1" }), ev("PermissionRequest", 180, { toolName: "Bash" })];
 
   test("request pairs with the open PreToolUse and waits", () => {
     const { world, cues } = run(ask);
@@ -155,7 +148,11 @@ describe("needs me: permission (korek)", () => {
   test("permission_prompt: creates the need if the request was missed, reminds once otherwise", () => {
     const missed = run([ev("PreToolUse", 1, { toolName: "Bash", toolUseId: "t1" }), ev("Notification", 6000, { notificationType: "permission_prompt" })]);
     expect(session(missed.world).need?.kind).toBe("permission");
-    const reminded = run([...ask, ev("Notification", 6200, { notificationType: "permission_prompt" }), ev("Notification", 9000, { notificationType: "permission_prompt" })]);
+    const reminded = run([
+      ...ask,
+      ev("Notification", 6200, { notificationType: "permission_prompt" }),
+      ev("Notification", 9000, { notificationType: "permission_prompt" }),
+    ]);
     expect(kinds(reminded.cues).filter((k) => k === "needReminder")).toHaveLength(1);
   });
 
@@ -213,11 +210,7 @@ describe("failures", () => {
 
 describe("compaction (kopi run)", () => {
   test("working → compacting → back to working", () => {
-    const { world, cues } = run([
-      ev("PreToolUse", 1, { toolName: "Read", toolUseId: "t1" }),
-      ev("PreCompact", 2, { compactTrigger: "auto" }),
-      ev("Stop", 3),
-    ]);
+    const { world, cues } = run([ev("PreToolUse", 1, { toolName: "Read", toolUseId: "t1" }), ev("PreCompact", 2, { compactTrigger: "auto" }), ev("Stop", 3)]);
     expect(session(world)).toMatchObject({ phase: "compacting", resumePhase: "working" });
     const after = run([ev("PostCompact", 4, { compactTrigger: "auto" })], world);
     expect(session(after.world).phase).toBe("working");
@@ -263,7 +256,8 @@ describe("subagents (friends)", () => {
     let world = EMPTY_WORLD;
     for (let i = 0; i < 6; i++) world = run([ev("SessionStart", i, { sessionId: `0000000${i}-0000-0000-0000-000000000000` })], world).world;
     const parent = "00000000-0000-0000-0000-000000000000";
-    for (const a of ["f1", "f2", "f3", "f4", "f5"]) world = run([ev("SubagentStart", 10, { sessionId: parent, agentId: a, agentType: "general-purpose" })], world).world;
+    for (const a of ["f1", "f2", "f3", "f4", "f5"])
+      world = run([ev("SubagentStart", 10, { sessionId: parent, agentId: a, agentType: "general-purpose" })], world).world;
     const seats = Object.values(world.sessions[parent]!.subagents).map((f) => f.seat);
     expect(seats).toEqual(["stool-2", "stool-4", "hood-1", "hood-2", null]);
     const all = [...Object.values(world.sessions).map((s) => s.seat), ...seats].filter((x) => x !== null);
@@ -309,7 +303,17 @@ describe("seats", () => {
     const ids = Array.from({ length: 11 }, (_, i) => `${String(i).padStart(8, "0")}-0000-0000-0000-000000000000`);
     for (const [i, id] of ids.entries()) world = run([ev("SessionStart", i, { sessionId: id })], world).world;
     expect(ids.map((id) => world.sessions[id]!.seat)).toEqual([
-      "bench-1a", "bench-2a", "bench-1b", "bench-2b", "stool-1", "stool-3", "stool-2", "stool-4", "hood-1", "hood-2", null,
+      "bench-1a",
+      "bench-2a",
+      "bench-1b",
+      "bench-2b",
+      "stool-1",
+      "stool-3",
+      "stool-2",
+      "stool-4",
+      "hood-1",
+      "hood-2",
+      null,
     ]);
   });
 });
@@ -354,7 +358,11 @@ describe("timers (tick)", () => {
   });
 
   test("stale friends leave", () => {
-    const { world } = run([ev("SessionStart", 0), ev("SubagentStart", 1, { agentId: "a1", agentType: "Explore" }), ev("PreToolUse", cfg.subagentStaleMs, { toolName: "Bash", toolUseId: "t" })]);
+    const { world } = run([
+      ev("SessionStart", 0),
+      ev("SubagentStart", 1, { agentId: "a1", agentType: "Explore" }),
+      ev("PreToolUse", cfg.subagentStaleMs, { toolName: "Bash", toolUseId: "t" }),
+    ]);
     const r = tick(world, 1 + cfg.subagentStaleMs, cfg);
     expect(session(r.world).subagents).toEqual({});
     expect(kinds(r.cues)).toEqual(["friendLeft"]);
@@ -368,7 +376,10 @@ describe("timers (tick)", () => {
 
 describe("insights (timeline, tool mix, waiting, milestones)", () => {
   const M = 60_000;
-  const tool = (name: string, at: number, id: string): IngestEvent[] => [ev("PreToolUse", at, { toolName: name, toolUseId: id }), ev("PostToolUse", at + 1, { toolName: name, toolUseId: id })];
+  const tool = (name: string, at: number, id: string): IngestEvent[] => [
+    ev("PreToolUse", at, { toolName: name, toolUseId: id }),
+    ev("PostToolUse", at + 1, { toolName: name, toolUseId: id }),
+  ];
 
   test("the timeline records state changes only, thinking and tool calls both count as work", () => {
     const { world } = run([

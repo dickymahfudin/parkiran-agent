@@ -114,7 +114,10 @@ export function loftGeometry(spec: LoftSpec): THREE.BufferGeometry {
     }
   }
   if (spec.caps && !spec.arc) {
-    for (const [s, flip] of [[0, true], [spec.zs.length - 1, false]] as const) {
+    for (const [s, flip] of [
+      [0, true],
+      [spec.zs.length - 1, false],
+    ] as const) {
       const z = spec.zs[s]!;
       const center = pos.length / 3;
       pos.push(0, (spec.bottom(z) + spec.top(z)) / 2, z);

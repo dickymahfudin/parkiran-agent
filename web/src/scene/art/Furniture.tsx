@@ -131,7 +131,12 @@ function Gerobak() {
       <mesh position={[0, 1.22, 0]} material={glass}>
         <boxGeometry args={[1.36, 0.45, 0.58]} />
       </mesh>
-      {[[-0.68, -0.29], [0.68, -0.29], [-0.68, 0.29], [0.68, 0.29]].map(([x, z]) => (
+      {[
+        [-0.68, -0.29],
+        [0.68, -0.29],
+        [-0.68, 0.29],
+        [0.68, 0.29],
+      ].map(([x, z]) => (
         <mesh key={`${x}${z}`} position={[x!, 1.45, z!]} material={metal} castShadow>
           <boxGeometry args={[0.025, 0.95, 0.025]} />
         </mesh>

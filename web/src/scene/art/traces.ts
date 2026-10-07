@@ -1,6 +1,6 @@
 // Where the traces by a seat go and how many there are. Pure, unit tested; drawn by Traces.tsx.
 import type { PublicSession } from "../../../../shared/src/protocol.ts";
-import { SEAT_PLACES } from "../layout.ts";
+import { BENCH_Y, SEAT_PLACES } from "../layout.ts";
 
 /** One butt per this much time in the lot. */
 export const BUTT_EVERY_MS = 15 * 60_000;
@@ -20,7 +20,7 @@ export function traceSpot(seatId: string): TraceSpot | null {
   const [x, , z] = seat.hip;
   if (seat.style === "bench") {
     const outward = seatId.endsWith("a") ? -1 : 1;
-    return { at: [x + outward * 0.33, 0.47, z - 0.02], along: [outward, 0] };
+    return { at: [x + outward * 0.33, BENCH_Y, z - 0.02], along: [outward, 0] };
   }
   if (seat.style === "stool") return { at: [x + 0.05, 0, z + 0.34], along: [0, 1] };
   return { at: [x + 0.62, 0, z + 0.38], along: [1, 0] };

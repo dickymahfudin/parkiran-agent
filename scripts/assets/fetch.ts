@@ -26,8 +26,7 @@ async function getJson<T>(url: string): Promise<T> {
 }
 
 /** Skips files already present with the right md5; re-downloads once on a mismatch, then fails. */
-const download = (ref: unknown, label: string, dest: string): Promise<number> =>
-  verifiedDownload(requireFileRef(ref, label), dest, { headers: UA });
+const download = (ref: unknown, label: string, dest: string): Promise<number> => verifiedDownload(requireFileRef(ref, label), dest, { headers: UA });
 
 async function info(id: string, kind: ManifestEntry["kind"]): Promise<ManifestEntry> {
   const meta = await getJson<{ name: string; authors: Record<string, string> }>(`${API}/info/${id}`);
@@ -51,7 +50,11 @@ for (const { id } of POLYHAVEN_MODELS) {
 for (const { id } of POLYHAVEN_TEXTURES) {
   const files = await getJson<Record<string, Record<string, Record<string, FileRef>>>>(`${API}/files/${id}`);
   const dir = join(RAW, "textures", id);
-  for (const [map, out] of [["Diffuse", "diff"], ["nor_gl", "nor"], ["arm", "arm"]] as const) {
+  for (const [map, out] of [
+    ["Diffuse", "diff"],
+    ["nor_gl", "nor"],
+    ["arm", "arm"],
+  ] as const) {
     const ref = files[map]?.["2k"]?.jpg ?? files[map]?.["1k"]?.jpg;
     if (!ref) throw new Error(`${id}: missing ${map}`);
     total += await download(ref, `${id} ${map}`, join(dir, `${out}.jpg`));

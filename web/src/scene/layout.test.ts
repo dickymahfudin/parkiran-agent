@@ -1,5 +1,26 @@
 import { describe, expect, test } from "bun:test";
-import { AWNING_POLES, COUNTER, DESPAWN_POINT, SEAT_PLACES, SIT_ROOT_BACK, SPAWN_POINT, STANDING_SPOTS, WARUNG_STOOLS, assignStandingSpots, assignWarungStools, clearToStand, planPath, solidAt, type Vec2 } from "./layout.ts";
+import { OWNER_STOOL } from "./characters/warungOwner.ts";
+import {
+  AWNING_POLES,
+  BENCH_Y,
+  CAR_HALF_LENGTH,
+  CAR_LENGTH,
+  CLIP_SEAT_Y,
+  COUNTER,
+  DESPAWN_POINT,
+  SEAT_PLACES,
+  SIT_ROOT_BACK,
+  SPAWN_POINT,
+  STANDING_SPOTS,
+  STOOL_Y,
+  WARUNG_STOOLS,
+  assignStandingSpots,
+  assignWarungStools,
+  clearToStand,
+  planPath,
+  solidAt,
+  type Vec2,
+} from "./layout.ts";
 
 /** Seated knees stick out about this far in front of the hip joint. */
 const KNEE_AHEAD = 0.45;
@@ -52,7 +73,8 @@ describe("standing spots", () => {
   test("every spot is clear of sitters, vehicles and furniture, apart from the others and off the walking lanes", () => {
     for (const spot of STANDING_SPOTS) {
       expect(clearToStand(spot.point)).toBe(true);
-      for (const other of STANDING_SPOTS) if (other !== spot) expect(Math.hypot(spot.point[0] - other.point[0], spot.point[1] - other.point[1])).toBeGreaterThan(1.5);
+      for (const other of STANDING_SPOTS)
+        if (other !== spot) expect(Math.hypot(spot.point[0] - other.point[0], spot.point[1] - other.point[1])).toBeGreaterThan(1.5);
       for (const path of walks) expect(clearance(path, spot.point)).toBeGreaterThan(0.45);
     }
   });
@@ -101,7 +123,10 @@ describe("warung stools for a coffee break", () => {
   });
 
   test("takes a stool back when it becomes a home or its drinker goes back", () => {
-    const current = new Map<string, string>([["a", "stool-2"], ["b", "stool-1"]]);
+    const current = new Map<string, string>([
+      ["a", "stool-2"],
+      ["b", "stool-1"],
+    ]);
     assignWarungStools(["b"], new Set(["stool-1"]), current);
     expect(Object.fromEntries(current)).toEqual({ b: "stool-2" });
   });
@@ -120,5 +145,21 @@ describe("re-planning a walk midway", () => {
     const path = planPath([-7.6, 4.6], seat.approach, seat.node);
     const first = path[1]!;
     expect(first[0]).toBeGreaterThan(-7.6);
+  });
+});
+
+describe("shared geometry constants", () => {
+  test("one source for car lengths and seat heights", () => {
+    expect(CAR_LENGTH.sedan).toBe(2 * CAR_HALF_LENGTH.sedan);
+    expect(CAR_LENGTH.hatch).toBe(2 * CAR_HALF_LENGTH.hatch);
+    expect(CAR_LENGTH).toEqual({ sedan: 4.45, hatch: 3.8 });
+    for (const seat of seats) {
+      if (seat.style === "bench") expect(seat.hip[1]).toBe(BENCH_Y);
+      if (seat.style === "stool") expect(seat.hip[1]).toBe(STOOL_Y);
+      if (seat.style === "hood") expect(seat.hip[1]).toBeGreaterThan(CLIP_SEAT_Y);
+    }
+    // Pak Joko's stool is one of the warung's, and the clips' reference seat is lower than any real bench here.
+    expect(OWNER_STOOL[1]).toBe(STOOL_Y);
+    expect(CLIP_SEAT_Y).toBeLessThanOrEqual(BENCH_Y);
   });
 });

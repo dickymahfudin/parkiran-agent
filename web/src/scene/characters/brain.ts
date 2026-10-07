@@ -2,7 +2,8 @@
 // Pure TypeScript (no three.js) so it can be unit tested and reused by both the placeholder and the rigged character.
 import type { WorkKind } from "../../../../shared/src/tools.ts";
 import { COUNTER, DESPAWN_POINT, SPAWN_POINT, WALK_SPEED, planPath, type SeatStyle, type Vec2 } from "../layout.ts";
-import { rng, type Habit } from "./identity.ts";
+import { SIT_S, STAND_S } from "./clips.ts";
+import type { Habit } from "./identity.ts";
 
 export type Clip =
   | "walk"
@@ -109,11 +110,21 @@ type Step =
 export const CROSSFADE_S = 0.3;
 // Calm loops end as soon as the target changes; gestures (sit, stand, light up, sigh...) always finish.
 const INTERRUPTIBLE: ReadonlySet<Clip> = new Set([
-  "sitIdle", "standIdle", "type", "think", "smoke", "sip", "stretch", "chat", "patPockets", "lookAround", "doze", "phone",
+  "sitIdle",
+  "standIdle",
+  "type",
+  "think",
+  "smoke",
+  "sip",
+  "stretch",
+  "chat",
+  "patPockets",
+  "lookAround",
+  "doze",
+  "phone",
 ]);
 const TYPING_RATE: Record<WorkKind, number> = { think: 0.8, read: 0.45, bash: 1.7, edit: 1.05, web: 0.6, agent: 0.4, other: 1 };
-// Durations of the rigged sitDown / standUp / frustrated clips (clips.json).
-const SIT_S = 1.29;
+// Durations of the rigged clips (clips.json); sitDown / standUp come from clips.ts.
 const THINK_S = 6.667;
 /** Length of the seated smoking loop (clips.json). */
 const SMOKE_S = 6.667;
@@ -121,7 +132,6 @@ const SMOKE_S = 6.667;
 const SIP_S = 3.5;
 /** A cigarette left in the lips while working burns down after this long. */
 const MOUTH_CIGARETTE_S = 240;
-const STAND_S = 1.04;
 const FRUSTRATED_S = 2.42;
 /** Length of the phone idle loop (clips.json). */
 const PHONE_S = 12;
@@ -143,6 +153,7 @@ const sameTarget = (a: Target | null, b: Target): boolean => {
 };
 
 export interface BrainOptions {
+  /** Per-person seed; the brain is deterministic today, the seed is kept for variation added later. */
   seed: number;
   home: Home;
   /** Start already at home (page load) instead of walking in from the street. */
@@ -154,7 +165,6 @@ export interface BrainOptions {
 }
 
 export class Brain {
-  private readonly random: () => number;
   private readonly habit: Habit;
   private home: Home;
   /** The seat sat on, or about to be: home, or a warung stool on a coffee break. */
@@ -178,7 +188,17 @@ export class Brain {
   private prevClipTime = 0;
   private blend = 1;
   private typingRate = 1;
-  private readonly props: PropState = { laptop: "closed", cigarette: "none", lighter: false, flame: false, cup: false, bubble: null, zzz: false, phone: false, done: false };
+  private readonly props: PropState = {
+    laptop: "closed",
+    cigarette: "none",
+    lighter: false,
+    flame: false,
+    cup: false,
+    bubble: null,
+    zzz: false,
+    phone: false,
+    done: false,
+  };
   private pendingReactions: Step[] = [];
   /** Where the neighbour sits while the two of them chat (decided per pair by the scene), else null. */
   private chatWith: Vec2 | null = null;
@@ -190,7 +210,6 @@ export class Brain {
   done = false;
 
   constructor(opts: BrainOptions) {
-    this.random = rng(opts.seed ^ 0x9e3779b9);
     this.habit = opts.habit ?? "kretek";
     this.home = opts.home;
     this.perch = opts.home;
@@ -329,11 +348,7 @@ export class Brain {
       return [this.clipStep(refused ? "sigh" : "standIdle", refused ? 1.6 : 0.6, { props: { bubble: null } }), ...sitBack];
     }
     if (refused) {
-      return [
-        this.clipStep("sigh", 1.6, { props: { bubble: null } }),
-        this.clipStep("pocketCig", 1.1, { propsEnd: { cigarette: "none" } }),
-        ...sitBack,
-      ];
+      return [this.clipStep("sigh", 1.6, { props: { bubble: null } }), this.clipStep("pocketCig", 1.1, { propsEnd: { cigarette: "none" } }), ...sitBack];
     }
     if (!granted) return [this.clipStep("standIdle", 0.6, { props: { bubble: null } }), ...sitBack];
     // Approved: a vaper takes a long pull straight away (no lighter).
@@ -422,7 +437,10 @@ export class Brain {
   }
 
   private goHome(): Step[] {
-    const steps: Step[] = [{ type: "walk", path: this.pathTo(this.home.point, this.home.node), index: 1 }, { type: "turn", yaw: this.home.yaw, duration: 0.45 }];
+    const steps: Step[] = [
+      { type: "walk", path: this.pathTo(this.home.point, this.home.node), index: 1 },
+      { type: "turn", yaw: this.home.yaw, duration: 0.45 },
+    ];
     this.perch = this.home;
     if (this.home.seat) steps.push(this.clipStep("sitDown", SIT_S, { posture: "seated", propsEnd: { laptop: "open" } }));
     return steps;
@@ -434,7 +452,10 @@ export class Brain {
     const fromHome = Math.hypot(this.x - this.home.point[0], this.z - this.home.point[1]);
     if (fromHome >= 0.2) return this.goHome();
     this.perch = this.home;
-    return [...this.settleOn(this.home, fromHome), this.clipStep("sitDown", SIT_S, { props: { laptop: "closed" }, posture: "seated", propsEnd: { laptop: "open" } })];
+    return [
+      ...this.settleOn(this.home, fromHome),
+      this.clipStep("sitDown", SIT_S, { props: { laptop: "closed" }, posture: "seated", propsEnd: { laptop: "open" } }),
+    ];
   }
 
   /** The last few centimetres to a place's spot and the turn to face its way, whichever are still missing. */
@@ -468,7 +489,12 @@ export class Brain {
   /** A kretek needs the lighter first; a vape just comes out of the pocket (the next step holds it), nothing for the rest. */
   private lightIfNeeded(): Step[] {
     if (this.habit !== "kretek" || this.props.cigarette === "lit" || this.props.cigarette === "mouth") return [];
-    return [this.clipStep("lightUp", 1.4, { props: { cigarette: "unlit", lighter: true, flame: true }, propsEnd: { lighter: false, flame: false, cigarette: "lit" } })];
+    return [
+      this.clipStep("lightUp", 1.4, {
+        props: { cigarette: "unlit", lighter: true, flame: true },
+        propsEnd: { lighter: false, flame: false, cigarette: "lit" },
+      }),
+    ];
   }
 
   /**
@@ -486,7 +512,11 @@ export class Brain {
     return [
       ...shut,
       ...this.lightIfNeeded(),
-      this.clipStep("phone", PHONE_S, { loop: true, props: { phone: true, cigarette: seated ? "lit" : "mouth" }, propsEnd: { phone: false, cigarette: "mouth" } }),
+      this.clipStep("phone", PHONE_S, {
+        loop: true,
+        props: { phone: true, cigarette: seated ? "lit" : "mouth" },
+        propsEnd: { phone: false, cigarette: "mouth" },
+      }),
     ];
   }
 
@@ -513,7 +543,11 @@ export class Brain {
       return [...shut, this.sip(), between];
     }
     const from = Math.hypot(this.x - place.point[0], this.z - place.point[1]);
-    if (from >= 0.2) return [{ type: "walk", path: this.pathTo(place.point, place.node), index: 1 }, { type: "turn", yaw: place.yaw, duration: 0.45 }];
+    if (from >= 0.2)
+      return [
+        { type: "walk", path: this.pathTo(place.point, place.node), index: 1 },
+        { type: "turn", yaw: place.yaw, duration: 0.45 },
+      ];
     if (!place.seat) return [...this.settleOn(place, from), this.sip(), this.clipStep("standIdle", 4)];
     this.perch = place;
     return [...this.settleOn(place, from), this.clipStep("sitDown", SIT_S, { posture: "seated" })];
@@ -527,7 +561,8 @@ export class Brain {
       if (this.posture === "offstage") return [{ type: "vanish" }];
       const out: Step[] = [];
       if (this.posture === "seated") {
-        if (this.habit === "kretek" && this.props.cigarette !== "none") out.push(this.clipStep("stubOut", 1.2, { props: { cigarette: "lit" }, propsEnd: { cigarette: "none" } }));
+        if (this.habit === "kretek" && this.props.cigarette !== "none")
+          out.push(this.clipStep("stubOut", 1.2, { props: { cigarette: "lit" }, propsEnd: { cigarette: "none" } }));
         else this.props.cigarette = "none";
         if (this.props.laptop === "open") out.push(this.clipStep("closeLaptop", 1.0, { propsEnd: { laptop: "closed" } }));
         out.push(this.standUp());
@@ -542,7 +577,11 @@ export class Brain {
       if (this.props.cup) return this.coffeeBreak();
       if (this.posture === "seated") return [this.standUp()];
       const atCounter = Math.hypot(this.x - COUNTER.point[0], this.z - COUNTER.point[1]) < 0.2;
-      if (!atCounter) return [{ type: "walk", path: this.pathTo(COUNTER.point, COUNTER.node), index: 1 }, { type: "turn", yaw: COUNTER.yaw, duration: 0.4 }];
+      if (!atCounter)
+        return [
+          { type: "walk", path: this.pathTo(COUNTER.point, COUNTER.node), index: 1 },
+          { type: "turn", yaw: COUNTER.yaw, duration: 0.4 },
+        ];
       return [this.clipStep("buy", 3, { propsEnd: { cup: true } })];
     }
 

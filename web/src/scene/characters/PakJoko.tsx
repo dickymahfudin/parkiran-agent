@@ -35,11 +35,13 @@ function Stool() {
       <mesh position={[0, y - 0.02, 0]} material={wood} castShadow receiveShadow>
         <boxGeometry args={[0.3, 0.04, 0.3]} />
       </mesh>
-      {[-1, 1].flatMap((a) => [-1, 1].map((b) => (
-        <mesh key={`${a}${b}`} position={[a * 0.12, (y - 0.04) / 2, b * 0.12]} material={wood} castShadow>
-          <boxGeometry args={[0.035, y - 0.04, 0.035]} />
-        </mesh>
-      )))}
+      {[-1, 1].flatMap((a) =>
+        [-1, 1].map((b) => (
+          <mesh key={`${a}${b}`} position={[a * 0.12, (y - 0.04) / 2, b * 0.12]} material={wood} castShadow>
+            <boxGeometry args={[0.035, y - 0.04, 0.035]} />
+          </mesh>
+        )),
+      )}
     </group>
   );
 }

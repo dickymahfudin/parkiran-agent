@@ -1,17 +1,15 @@
 // Pak Joko behind the warung counter: a small routine of his own (smoke, a sip, his phone, a look around), serving
 // whoever comes to buy a kopi, and a nap on his stool late at night. Pure: drives the shared character via frames.
-import { SIT_ROOT_BACK, type Vec2 } from "../layout.ts";
+import { SIT_ROOT_BACK, STOOL_Y, type Vec2 } from "../layout.ts";
 import { CROSSFADE_S, type Clip, type Frame, type PropState } from "./brain.ts";
+import { SIT_S, STAND_S } from "./clips.ts";
 import { rng } from "./identity.ts";
 
 /** Where he stands: behind the counter, facing the serving window (−X). */
 export const OWNER_SPOT: Vec2 = [4.45, -3.95];
 export const OWNER_YAW = -Math.PI / 2;
 /** His stool right behind him, so sitting down needs no step: hips this far back from where his feet are. */
-export const OWNER_STOOL: [number, number, number] = [OWNER_SPOT[0] + SIT_ROOT_BACK, 0.445, OWNER_SPOT[1]];
-
-const SIT_S = 1.29;
-const STAND_S = 1.04;
+export const OWNER_STOOL: [number, number, number] = [OWNER_SPOT[0] + SIT_ROOT_BACK, STOOL_Y, OWNER_SPOT[1]];
 
 interface Activity {
   clip: Clip;
@@ -28,7 +26,17 @@ const ROUTINE: readonly Activity[] = [
 ];
 const IDLE_S: [number, number] = [6, 14];
 
-const NO_PROPS: PropState = { laptop: "none", cigarette: "none", lighter: false, flame: false, cup: false, bubble: null, zzz: false, phone: false, done: false };
+const NO_PROPS: PropState = {
+  laptop: "none",
+  cigarette: "none",
+  lighter: false,
+  flame: false,
+  cup: false,
+  bubble: null,
+  zzz: false,
+  phone: false,
+  done: false,
+};
 
 type Mode = "routine" | "serve" | "night";
 

@@ -46,7 +46,7 @@ describe("sunPosition (Jakarta)", () => {
           const ref = SunCalc.getPosition(date, place.lat, place.lon);
           const refElevation = (ref.altitude * 180) / Math.PI;
           // SunCalc azimuth is measured from south, westward positive.
-          const refAzimuth = (((ref.azimuth * 180) / Math.PI + 180) % 360 + 360) % 360;
+          const refAzimuth = ((((ref.azimuth * 180) / Math.PI + 180) % 360) + 360) % 360;
           worst = Math.max(worst, separation(ours.elevation, ours.azimuth, refElevation, refAzimuth));
         }
       }

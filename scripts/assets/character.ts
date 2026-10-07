@@ -10,8 +10,14 @@ const BLENDER = process.env.BLENDER ?? "/Applications/Blender.app/Contents/MacOS
 
 // All direct downloads, no login. Licences are listed in CREDITS.md.
 const SOURCES: { url: string; to: string }[] = [
-  { url: "https://extensions.blender.org/download/sha256:4f0a879d64a39bf646fbf5f53601ac678855da329d650617dca5737548239a87/add-on-mpfb-v2.0.17.zip", to: "mpfb/add-on-mpfb-v2.0.17.zip" },
-  { url: "https://files.makehumancommunity.org/asset_packs/makehuman_system_assets/makehuman_system_assets_cc0.zip", to: "makehuman/system_assets/makehuman_system_assets_cc0.zip" },
+  {
+    url: "https://extensions.blender.org/download/sha256:4f0a879d64a39bf646fbf5f53601ac678855da329d650617dca5737548239a87/add-on-mpfb-v2.0.17.zip",
+    to: "mpfb/add-on-mpfb-v2.0.17.zip",
+  },
+  {
+    url: "https://files.makehumancommunity.org/asset_packs/makehuman_system_assets/makehuman_system_assets_cc0.zip",
+    to: "makehuman/system_assets/makehuman_system_assets_cc0.zip",
+  },
   { url: "https://files.makehumancommunity.org/asset_packs/shirts01/shirts01_cc0.zip", to: "makehuman/shirts01/shirts01_cc0.zip" },
   { url: "https://files.makehumancommunity.org/asset_packs/pants01/pants01_cc0.zip", to: "makehuman/pants01/pants01_cc0.zip" },
   { url: "https://files.makehumancommunity.org/asset_packs/pants03/pants03_ccby.zip", to: "makehuman/pants03/pants03_ccby.zip" },

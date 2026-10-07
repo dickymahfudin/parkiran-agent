@@ -45,8 +45,11 @@ bun run web                  # Vite dev server on http://127.0.0.1:4748 (hot rel
 bun run simulate -- --list                 # scripted sessions, no Claude needed
 bun run simulate -- --port=4757 --scenario=tour   # against a test server (PARKIRAN_PORT=4757 bun run server)
 bun scripts/watch.ts --seconds=120   # prints live state changes and the HUD states seen
-bun test && bun run typecheck
+bun test && bun run typecheck && bun run lint   # lint = Biome (biome.json); `bun run lint:fix` applies the safe fixes
 ```
+
+CI (`.github/workflows/ci.yml`) runs install, lint, typecheck, tests and the web build on every push to `main` and every
+pull request, with the Bun version from `.tool-versions`.
 
 Simulator scenarios: `working`, `approve`, `deny`, `question`, `failure`, `compact`, `subagent`, `idle`, `end`,
 `six` (six busy sessions), `tour` (every state at once). Options: `--speed=2`, `--loop`, `--fresh`. `--port=` is

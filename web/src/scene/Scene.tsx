@@ -26,7 +26,10 @@ import { envState } from "./env/envState.ts";
 import { DebugHandle, SceneClock, cameraFromUrl } from "./SceneDebug.tsx";
 
 // Framed on the benches, the gerobak and the warung (where the people are), clear of the session list at the top left.
-const DEFAULT_CAMERA = { position: [-5.0, 6.2, 10.6], target: [0.0, 0.9, -3.0] } as const satisfies { position: [number, number, number]; target: [number, number, number] };
+const DEFAULT_CAMERA = { position: [-5.0, 6.2, 10.6], target: [0.0, 0.9, -3.0] } as const satisfies {
+  position: [number, number, number];
+  target: [number, number, number];
+};
 const SHOW_STATS = new URLSearchParams(location.search).has("stats");
 const COMPACT_DPR = 1;
 /** Resolution steps; few and far apart, since every change reallocates the composer's buffers (a visible hitch). */

@@ -6,8 +6,31 @@ import type { Clip } from "./brain.ts";
 import { rigPlay, rigTime, sitHipsBack, type ClipsJson } from "./rig.ts";
 
 const ALL_CLIPS: Clip[] = [
-  "walk", "standIdle", "sitDown", "standUp", "sitIdle", "type", "think", "smoke", "sip", "stretch", "chat", "frustrated",
-  "patPockets", "lookAround", "lightUp", "drag", "sigh", "pocketCig", "doze", "buy", "stubOut", "closeLaptop", "wave", "phone", "push",
+  "walk",
+  "standIdle",
+  "sitDown",
+  "standUp",
+  "sitIdle",
+  "type",
+  "think",
+  "smoke",
+  "sip",
+  "stretch",
+  "chat",
+  "frustrated",
+  "patPockets",
+  "lookAround",
+  "lightUp",
+  "drag",
+  "sigh",
+  "pocketCig",
+  "doze",
+  "buy",
+  "stubOut",
+  "closeLaptop",
+  "wave",
+  "phone",
+  "push",
 ];
 
 const CLIPS_JSON = join(import.meta.dir, "..", "..", "..", "public", "assets", "character", "clips.json");
@@ -63,7 +86,9 @@ describe("rig clip mapping", () => {
 
   test.skipIf(meta === null)("clips.json has every mapped clip and matches the layout's sitting constants", () => {
     const m = meta!;
-    for (const c of ALL_CLIPS) for (const seated of [true, false]) for (const cup of [null, "left", "right"] as const) for (const n of names(rigPlay(c, seated, cup))) expect(m.clips[n]).toBeDefined();
+    for (const c of ALL_CLIPS)
+      for (const seated of [true, false])
+        for (const cup of [null, "left", "right"] as const) for (const n of names(rigPlay(c, seated, cup))) expect(m.clips[n]).toBeDefined();
     expect(sitHipsBack(m)).toBeCloseTo(SIT_ROOT_BACK, 2);
     // Sitting clips put the hips about 9 cm above the seat they were made for.
     expect(m.sitHips[1] - CLIP_SEAT_Y).toBeGreaterThan(0.07);

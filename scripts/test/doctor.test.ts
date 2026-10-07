@@ -1,15 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { HOOK_EVENTS } from "../../shared/src/events.ts";
-import {
-  checkEnv,
-  checkHandlers,
-  checkHealth,
-  checkManifest,
-  checkSettings,
-  checkWebBuild,
-  exitCode,
-  resolvePort,
-} from "../lib/doctor.ts";
+import { checkEnv, checkHandlers, checkHealth, checkManifest, checkSettings, checkWebBuild, exitCode, resolvePort } from "../lib/doctor.ts";
 import { parseSettings, planInstall, type Json } from "../lib/settings-hooks.ts";
 
 const target = { bunPath: "/opt/bun/bin/bun", relayPath: "/repo/relay/src/index.ts" };
@@ -77,20 +68,61 @@ describe("doctor checks", () => {
   test("health: refused is a warning, a bad answer is a failure, ok is ok", async () => {
     const refused = Object.assign(new Error("Unable to connect"), { code: "ECONNREFUSED" });
     const asFetch = (fn: (url: string) => Promise<Response>) => fn as unknown as typeof fetch;
-    expect((await checkHealth(1, asFetch(async () => { throw refused; }))).status).toBe("warn");
-    expect((await checkHealth(1, asFetch(async () => new Response("x", { status: 500 })))).status).toBe("fail");
-    expect((await checkHealth(1, asFetch(async () => Response.json({ ok: false })))).status).toBe("fail");
-    const ok = await checkHealth(1, asFetch(async () => Response.json({ ok: true, sessions: 2 })));
+    expect(
+      (
+        await checkHealth(
+          1,
+          asFetch(async () => {
+            throw refused;
+          }),
+        )
+      ).status,
+    ).toBe("warn");
+    expect(
+      (
+        await checkHealth(
+          1,
+          asFetch(async () => new Response("x", { status: 500 })),
+        )
+      ).status,
+    ).toBe("fail");
+    expect(
+      (
+        await checkHealth(
+          1,
+          asFetch(async () => Response.json({ ok: false })),
+        )
+      ).status,
+    ).toBe("fail");
+    const ok = await checkHealth(
+      1,
+      asFetch(async () => Response.json({ ok: true, sessions: 2 })),
+    );
     expect(ok.status).toBe("ok");
     expect(ok.detail).toContain("2 sessions");
-    const boom = await checkHealth(1, asFetch(async () => { throw new Error("TLS exploded"); }));
+    const boom = await checkHealth(
+      1,
+      asFetch(async () => {
+        throw new Error("TLS exploded");
+      }),
+    );
     expect(boom.status).toBe("fail");
   });
 
   test("web build missing is a warning; exit code is 1 only on fail", () => {
     expect(checkWebBuild("/w/index.html", () => false).status).toBe("warn");
     expect(checkWebBuild("/w/index.html", () => true).status).toBe("ok");
-    expect(exitCode([{ status: "ok", item: "a", detail: "" }, { status: "warn", item: "b", detail: "" }])).toBe(0);
-    expect(exitCode([{ status: "ok", item: "a", detail: "" }, { status: "fail", item: "b", detail: "" }])).toBe(1);
+    expect(
+      exitCode([
+        { status: "ok", item: "a", detail: "" },
+        { status: "warn", item: "b", detail: "" },
+      ]),
+    ).toBe(0);
+    expect(
+      exitCode([
+        { status: "ok", item: "a", detail: "" },
+        { status: "fail", item: "b", detail: "" },
+      ]),
+    ).toBe(1);
   });
 });

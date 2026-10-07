@@ -19,10 +19,48 @@ interface PosterSpec {
 
 // Classic street-wall ads; phone numbers are deliberately masked.
 const POSTERS: PosterSpec[] = [
-  { w: 0.42, h: 0.6, paper: "#f2d64b", lines: [{ text: "SEDOT", color: "#c4161c", size: 74, weight: 900 }, { text: "WC", color: "#c4161c", size: 96, weight: 900 }, { text: "24 JAM", color: "#1d1d1b", size: 40 }, { text: "0812-XXXX-XXXX", color: "#1d1d1b", size: 26 }] },
-  { w: 0.4, h: 0.58, paper: "#f4f1e8", lines: [{ text: "KEJAR PAKET C", color: "#1f4fa3", size: 46, weight: 900 }, { text: "ijazah setara SMA", color: "#1f4fa3", size: 34, weight: 700 }, { text: "biar tenang kalau", color: "#333", size: 27 }, { text: "ditanya pas naik jabatan", color: "#333", size: 27 }, { text: "hub. 0857-XXXX", color: "#333", size: 24 }] },
-  { w: 0.36, h: 0.5, paper: "#e9f0f7", lines: [{ text: "TERIMA", color: "#0b6b3a", size: 46, weight: 800 }, { text: "KOS PUTRA", color: "#0b6b3a", size: 40, weight: 800 }, { text: "AC • WIFI", color: "#222", size: 32 }] },
-  { w: 0.5, h: 0.36, paper: "#ffffff", lines: [{ text: "DIJUAL", color: "#d11", size: 60, weight: 900 }, { text: "TANPA PERANTARA", color: "#222", size: 28 }] },
+  {
+    w: 0.42,
+    h: 0.6,
+    paper: "#f2d64b",
+    lines: [
+      { text: "SEDOT", color: "#c4161c", size: 74, weight: 900 },
+      { text: "WC", color: "#c4161c", size: 96, weight: 900 },
+      { text: "24 JAM", color: "#1d1d1b", size: 40 },
+      { text: "0812-XXXX-XXXX", color: "#1d1d1b", size: 26 },
+    ],
+  },
+  {
+    w: 0.4,
+    h: 0.58,
+    paper: "#f4f1e8",
+    lines: [
+      { text: "KEJAR PAKET C", color: "#1f4fa3", size: 46, weight: 900 },
+      { text: "ijazah setara SMA", color: "#1f4fa3", size: 34, weight: 700 },
+      { text: "biar tenang kalau", color: "#333", size: 27 },
+      { text: "ditanya pas naik jabatan", color: "#333", size: 27 },
+      { text: "hub. 0857-XXXX", color: "#333", size: 24 },
+    ],
+  },
+  {
+    w: 0.36,
+    h: 0.5,
+    paper: "#e9f0f7",
+    lines: [
+      { text: "TERIMA", color: "#0b6b3a", size: 46, weight: 800 },
+      { text: "KOS PUTRA", color: "#0b6b3a", size: 40, weight: 800 },
+      { text: "AC • WIFI", color: "#222", size: 32 },
+    ],
+  },
+  {
+    w: 0.5,
+    h: 0.36,
+    paper: "#ffffff",
+    lines: [
+      { text: "DIJUAL", color: "#d11", size: 60, weight: 900 },
+      { text: "TANPA PERANTARA", color: "#222", size: 28 },
+    ],
+  },
 ];
 
 function posterTexture(p: PosterSpec, seed: number): THREE.CanvasTexture {
@@ -130,7 +168,27 @@ function atticGeometry(width: number, roofDepth: number): THREE.ExtrudeGeometry 
 }
 
 /** `shadows: false` for set dressing east of the lot, which would otherwise shade the whole lot all morning. */
-export function House({ x, z = HOUSE_Z, yaw = 0, width, height, color, roofDepth, seed, shadows = true }: { x: number; z?: number; yaw?: number; width: number; height: number; color: string; roofDepth: number; seed: number; shadows?: boolean }) {
+export function House({
+  x,
+  z = HOUSE_Z,
+  yaw = 0,
+  width,
+  height,
+  color,
+  roofDepth,
+  seed,
+  shadows = true,
+}: {
+  x: number;
+  z?: number;
+  yaw?: number;
+  width: number;
+  height: number;
+  color: string;
+  roofDepth: number;
+  seed: number;
+  shadows?: boolean;
+}) {
   const tiles = usePbr("clay_roof_tiles", [width / 1.5, roofDepth / 1.5]);
   const plaster = usePbr("painted_plaster_wall", [width / 3, height / 3]);
   const wallMat = useMemo(() => pbrMaterial(plaster, { color }), [plaster, color]);
@@ -148,7 +206,14 @@ export function House({ x, z = HOUSE_Z, yaw = 0, width, height, color, roofDepth
     () =>
       windows.map((w, i) => {
         const curtain = curtainTexture(seed * 7 + i, w.warm);
-        return new THREE.MeshStandardMaterial({ color: "#1b232b", roughness: 0.12, metalness: 0.2, emissive: "#ffffff", emissiveMap: curtain, emissiveIntensity: 0 });
+        return new THREE.MeshStandardMaterial({
+          color: "#1b232b",
+          roughness: 0.12,
+          metalness: 0.2,
+          emissive: "#ffffff",
+          emissiveMap: curtain,
+          emissiveIntensity: 0,
+        });
       }),
     [windows, seed],
   );
@@ -211,7 +276,12 @@ function WaterTower({ x, z }: { x: number; z: number }) {
   const top = tankY + TH / 2;
   const pipeX = half + 0.07;
   const tankWallX = Math.sqrt(R * R - half * half);
-  const corners = [[-half, -half], [half, -half], [half, half], [-half, half]] as const;
+  const corners = [
+    [-half, -half],
+    [half, -half],
+    [half, half],
+    [-half, half],
+  ] as const;
   return (
     <group position={[x, 0, z]}>
       {corners.map(([dx, dz]) => (
@@ -272,11 +342,27 @@ export function Walls() {
     return new THREE.MeshStandardMaterial({ map: t, transparent: true, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -1 });
   }, []);
   const posters = useMemo(
-    () => POSTERS.map((p, i) => ({ p, mat: new THREE.MeshStandardMaterial({ map: posterTexture(p, 31 + i), roughness: 0.85, transparent: true, alphaTest: 0.05, polygonOffset: true, polygonOffsetFactor: -2 }) })),
+    () =>
+      POSTERS.map((p, i) => ({
+        p,
+        mat: new THREE.MeshStandardMaterial({
+          map: posterTexture(p, 31 + i),
+          roughness: 0.85,
+          transparent: true,
+          alphaTest: 0.05,
+          polygonOffset: true,
+          polygonOffsetFactor: -2,
+        }),
+      })),
     [],
   );
   // x, y, tilt. Clear of the gerobak (x 0…1.5, roof at 1.96 m) and above the heads of people on the benches.
-  const posterSpots: [number, number, number][] = [[-5.2, 1.55, -0.03], [-2.25, 1.7, 0.04], [-1.82, 1.62, -0.06], [-0.45, 1.97, 0.02]];
+  const posterSpots: [number, number, number][] = [
+    [-5.2, 1.55, -0.03],
+    [-2.25, 1.7, 0.04],
+    [-1.82, 1.62, -0.06],
+    [-0.45, 1.97, 0.02],
+  ];
 
   return (
     <group>

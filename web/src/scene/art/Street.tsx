@@ -82,7 +82,11 @@ function Wires() {
       const a = order[k]!;
       const b = order[k + 1]!;
       for (const dz of [-0.7, 0, 0.7]) out.push(new THREE.TubeGeometry(sagCurve(top(a, dz), top(b, dz), 0.55), 24, 0.011, 4));
-      for (const [y, sag] of [[5.3, 0.8], [5.15, 1.05], [5.0, 0.7]] as const) {
+      for (const [y, sag] of [
+        [5.3, 0.8],
+        [5.15, 1.05],
+        [5.0, 0.7],
+      ] as const) {
         const p = (i: number) => new THREE.Vector3(POLES[i]!.x + 0.12, y, POLES[i]!.z);
         out.push(new THREE.TubeGeometry(sagCurve(p(a), p(b), sag), 24, 0.013, 4));
       }
@@ -115,7 +119,11 @@ function Lamp({ lamp: LAMP }: { lamp: (typeof LAMPS)[number] }) {
   useEffect(() => void (spot.current.target = target), [target]);
   const lens = useMemo(() => new THREE.MeshStandardMaterial({ color: "#fff4e0", emissive: "#ffd9a0", emissiveIntensity: 0 }), []);
   const arm = useMemo(() => {
-    const c = new THREE.QuadraticBezierCurve3(new THREE.Vector3(0, LAMP.armY - 0.6, 0), new THREE.Vector3(0.1, LAMP.armY + 0.35, 0), new THREE.Vector3(LAMP.reach, LAMP.armY + 0.25, 0));
+    const c = new THREE.QuadraticBezierCurve3(
+      new THREE.Vector3(0, LAMP.armY - 0.6, 0),
+      new THREE.Vector3(0.1, LAMP.armY + 0.35, 0),
+      new THREE.Vector3(LAMP.reach, LAMP.armY + 0.25, 0),
+    );
     return new THREE.TubeGeometry(c, 16, 0.035, 8);
   }, [LAMP.armY, LAMP.reach]);
   useFrame(() => {

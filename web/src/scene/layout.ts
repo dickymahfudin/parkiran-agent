@@ -50,9 +50,11 @@ export const SIT_ROOT_BACK = 0.28;
 /** Seat height the sitting clips were made for; higher seats lift the whole character. */
 export const CLIP_SEAT_Y = 0.45;
 const BENCH_Z = -4.85;
-const BENCH_Y = 0.47;
+/** Bench seat surface (m): the hips of its sitters rest here, and the ashtray by the free end stands on it (traces.ts). */
+export const BENCH_Y = 0.47;
 const STOOL_X = 2.45;
-const STOOL_Y = 0.445;
+/** Warung stool seat surface (m), the lot's stools and Pak Joko's own (warungOwner.ts) alike. */
+export const STOOL_Y = 0.445;
 // Perched on the rounded front edge of the hood (nose at z ≈ 3.42, 0.5 m high): the legs, stretched to the ground by the
 // leg IK, then pass in front of the bumper. Sitting further back on the high hood, legs that reach the ground would have
 // to go through it. HOOD_Y is the hood top where the buttocks rest, a few cm behind the hip joint.
@@ -72,8 +74,10 @@ export const CARS = [
 ] as const;
 
 export const COVERED_CAR = { x: 3.7, z: 2.6, yaw: 0.12 } as const;
-/** Bumper to bumper, halved, per car model (Vehicles.tsx). */
-const CAR_HALF_LENGTH = { sedan: 2.225, hatch: 1.9 } as const;
+/** Bumper to bumper, halved, per car model: the silhouettes in Vehicles.tsx run from −half to +half along z. */
+export const CAR_HALF_LENGTH = { sedan: 2.225, hatch: 1.9 } as const;
+/** Bumper to bumper, per car model (the length traffic keeps between cars, Ambient.tsx). */
+export const CAR_LENGTH = { sedan: CAR_HALF_LENGTH.sedan * 2, hatch: CAR_HALF_LENGTH.hatch * 2 } as const;
 /** Side by side, nose out, staggered so handlebars and mirrors never meet. */
 export const PARKED_SCOOTERS = [
   { x: 1.3, z: 2.2, yaw: 0.06 },
@@ -179,7 +183,16 @@ const dist = (a: Vec2, b: Vec2): number => Math.hypot(a[0] - b[0], a[1] - b[1]);
 
 /** Small props on the ground a standing person keeps clear of (x, z). */
 const PROPS_ON_GROUND: readonly Vec2[] = [
-  [-2.25, -5.3], [-5.9, -1.6], [LOT.minX + 0.35, -5.5], [-5.95, -5.25], [2.15, -5.35], [7.05, -0.6], [6.95, 4.6], [6.85, 3.9], [5.2, -1.25], [3.35, -1.95],
+  [-2.25, -5.3],
+  [-5.9, -1.6],
+  [LOT.minX + 0.35, -5.5],
+  [-5.95, -5.25],
+  [2.15, -5.35],
+  [7.05, -0.6],
+  [6.95, 4.6],
+  [6.85, 3.9],
+  [5.2, -1.25],
+  [3.35, -1.95],
 ];
 /** Half the width of a standing person with the laptop under the arm (m). */
 const BODY_R = 0.3;

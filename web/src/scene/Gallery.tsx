@@ -10,7 +10,7 @@ import { lookFor, type Habit } from "./characters/identity.ts";
 import { Person, type Animator } from "./characters/Person.tsx";
 import type { SmokeSource } from "./characters/props.tsx";
 import { SmokeSystem } from "./characters/props.tsx";
-import { CARS, HOOD_Z, SEAT_PLACES, SIT_ROOT_BACK } from "./layout.ts";
+import { CARS, CLIP_SEAT_Y, HOOD_Z, SEAT_PLACES, SIT_ROOT_BACK } from "./layout.ts";
 import { DebugHandle, SceneClock, cameraFromUrl } from "./SceneDebug.tsx";
 
 interface Slot {
@@ -23,7 +23,7 @@ interface Slot {
   friend?: boolean;
   /** An ojol rider on a moving scooter instead of a lot character. */
   ride?: boolean;
-  /** Seat surface height (m); the clips are made for 0.45, car hoods are higher. */
+  /** Seat surface height (m); the clips are made for CLIP_SEAT_Y, car hoods are higher. */
   seatY?: number;
   /** Head turn towards a chatting neighbour (rad). */
   look?: number;
@@ -43,12 +43,26 @@ const SLOTS: Slot[] = [
   { label: "ditolak (sigh)", clip: "sigh", t: 0.8, seated: false, props: { laptop: "closed", cigarette: "unlit" } },
   { label: "santai: rokok", clip: "smoke", t: 0.9, seated: true, props: { cigarette: "lit" } },
   { label: "santai: ngopi", clip: "sip", t: 1.0, seated: true, props: { cup: true } },
-  { label: "compact: seruput (kretek di tangan)", clip: "sip", t: 1.8, seated: true, habit: "kretek", props: { laptop: "closed", cup: true, cigarette: "lit" } },
+  {
+    label: "compact: seruput (kretek di tangan)",
+    clip: "sip",
+    t: 1.8,
+    seated: true,
+    habit: "kretek",
+    props: { laptop: "closed", cup: true, cigarette: "lit" },
+  },
   { label: "compact: kopi + kretek", clip: "smoke", t: 2.2, seated: true, habit: "kretek", props: { laptop: "closed", cup: true, cigarette: "lit" } },
   { label: "compact: kopi + vape", clip: "smoke", t: 2.2, seated: true, habit: "vape", props: { laptop: "closed", cup: true, cigarette: "lit" } },
   { label: "compact: kopi, santai", clip: "sitIdle", t: 1.6, seated: true, habit: "none", props: { laptop: "closed", cup: true } },
   { label: "compact: jalan bawa kopi", clip: "walk", t: 0.35, seated: false, habit: "kretek", props: { laptop: "closed", cup: true, cigarette: "mouth" } },
-  { label: "compact: berdiri pegang kopi", clip: "standIdle", t: 1.0, seated: false, habit: "kretek", props: { laptop: "closed", cup: true, cigarette: "mouth" } },
+  {
+    label: "compact: berdiri pegang kopi",
+    clip: "standIdle",
+    t: 1.0,
+    seated: false,
+    habit: "kretek",
+    props: { laptop: "closed", cup: true, cigarette: "mouth" },
+  },
   { label: "compact: seruput berdiri", clip: "sip", t: 1.8, seated: false, habit: "none", props: { laptop: "closed", cup: true } },
   { label: "non-smoker: HP + kopi", clip: "phone", t: 0.5, seated: true, habit: "none", props: { laptop: "closed", cup: true, phone: true } },
   { label: "non-smoker: HP + seruput", clip: "phone", t: 5.0, seated: true, habit: "none", props: { laptop: "closed", cup: true, phone: true } },
@@ -71,7 +85,17 @@ const SLOTS: Slot[] = [
 
 const SPACING_X = 1.25;
 const SPACING_Z = 2.1;
-const BASE_PROPS: PropState = { laptop: "open", cigarette: "none", lighter: false, flame: false, cup: false, bubble: null, zzz: false, phone: false, done: false };
+const BASE_PROPS: PropState = {
+  laptop: "open",
+  cigarette: "none",
+  lighter: false,
+  flame: false,
+  cup: false,
+  bubble: null,
+  zzz: false,
+  phone: false,
+  done: false,
+};
 
 function frozen(slot: Slot, x: number, z: number): Animator {
   const frame: Frame = {
@@ -80,7 +104,7 @@ function frozen(slot: Slot, x: number, z: number): Animator {
     z,
     yaw: 0,
     sit: slot.seated ? 1 : 0,
-    seatY: slot.seated ? (slot.seatY ?? 0.45) : 0,
+    seatY: slot.seated ? (slot.seatY ?? CLIP_SEAT_Y) : 0,
     seatStyle: slot.seated ? (slot.seatY ? "hood" : "bench") : null,
     clip: slot.clip,
     clipTime: slot.t,
@@ -135,7 +159,16 @@ export function Gallery() {
       <DebugHandle />
       <color attach="background" args={["#a9bccb"]} />
       <hemisphereLight args={["#e6eef6", "#4a443c", 1.0]} />
-      <directionalLight position={[-4, 8, 6]} intensity={2.1} castShadow shadow-mapSize={[2048, 2048]} shadow-camera-left={-14} shadow-camera-right={14} shadow-bias={-0.0003} shadow-normalBias={0.02} />
+      <directionalLight
+        position={[-4, 8, 6]}
+        intensity={2.1}
+        castShadow
+        shadow-mapSize={[2048, 2048]}
+        shadow-camera-left={-14}
+        shadow-camera-right={14}
+        shadow-bias={-0.0003}
+        shadow-normalBias={0.02}
+      />
       <mesh rotation={[-Math.PI / 2, 0, 0]} receiveShadow>
         <planeGeometry args={[width + 4, depth + 4]} />
         <meshStandardMaterial color="#4a4b4e" roughness={0.95} />
@@ -148,8 +181,8 @@ export function Gallery() {
               <Car {...CARS[0]} x={x} z={z - SIT_ROOT_BACK - (HOOD_Z - CARS[0].z)} />
             )}
             {slot.seated && !(slot.seatY !== undefined && range) && (
-              <mesh position={[x, ((slot.seatY ?? 0.45) - 0.01) / 2, z - SIT_ROOT_BACK - 0.05]} castShadow receiveShadow>
-                <boxGeometry args={[0.6, (slot.seatY ?? 0.45) - 0.01, 0.42]} />
+              <mesh position={[x, ((slot.seatY ?? CLIP_SEAT_Y) - 0.01) / 2, z - SIT_ROOT_BACK - 0.05]} castShadow receiveShadow>
+                <boxGeometry args={[0.6, (slot.seatY ?? CLIP_SEAT_Y) - 0.01, 0.42]} />
                 <meshStandardMaterial color="#8b5a2b" />
               </mesh>
             )}

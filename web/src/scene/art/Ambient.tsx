@@ -5,15 +5,15 @@ import * as THREE from "three";
 import { sound, type VehicleKind } from "../../audio/sound.ts";
 import { lookFor, rng } from "../characters/identity.ts";
 import { disposeSkinned } from "../characters/dispose.ts";
-import { attach, buildRig, useCharacterAsset } from "../characters/Person.tsx";
+import { attach, buildRig, useCharacterAsset } from "../characters/characterAsset.ts";
 import { envState } from "../env/envState.ts";
+import { CAR_LENGTH } from "../layout.ts";
 import { timeControl } from "../timeControl.ts";
 import { AssetBoundary, canvasTexture } from "./assets.tsx";
 import { StaticMerge } from "./StaticMerge.tsx";
 import { idleVehicle, LANES, laneX, stepTraffic, tickSpawner, type Spawner, type Vehicle } from "./traffic.ts";
 import { Car, MAT, Scooter } from "./Vehicles.tsx";
 
-const CAR_LENGTH = { sedan: 4.45, hatch: 3.8 } as const;
 const SCOOTER_LENGTH = 1.95;
 const TRAFFIC = [
   { color: "#20262e", model: "sedan", plate: "B 1934 PKR" },
@@ -66,7 +66,10 @@ function Traffic({ cars }: { cars: readonly Vehicle[] }) {
       })),
     [],
   );
-  const poolMat = useMemo(() => new THREE.MeshBasicMaterial({ map: poolTexture(), transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, opacity: 0 }), []);
+  const poolMat = useMemo(
+    () => new THREE.MeshBasicMaterial({ map: poolTexture(), transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, opacity: 0 }),
+    [],
+  );
   const camera = useThree((s) => s.camera);
 
   useFrame(() => {
@@ -123,10 +126,16 @@ export function Rider({ id, helmet }: { id: string; helmet: string }) {
   const rig = useMemo(() => {
     const r = buildRig(asset, look);
     // Helm bogo: an open half-shell with a short peak, sitting on the skull (centre 4 cm ahead of the head bone).
-    const shell = new THREE.Mesh(new THREE.SphereGeometry(0.122, 18, 10, 0, Math.PI * 2, 0, Math.PI / 2), new THREE.MeshPhysicalMaterial({ color: helmet, roughness: 0.25, clearcoat: 1 }));
+    const shell = new THREE.Mesh(
+      new THREE.SphereGeometry(0.122, 18, 10, 0, Math.PI * 2, 0, Math.PI / 2),
+      new THREE.MeshPhysicalMaterial({ color: helmet, roughness: 0.25, clearcoat: 1 }),
+    );
     shell.scale.set(1.02, 0.95, 1.1);
     shell.castShadow = true;
-    const peak = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.07, 0.006, 18, 1, false, -Math.PI / 2, Math.PI), new THREE.MeshStandardMaterial({ color: "#1b1d20", roughness: 0.4 }));
+    const peak = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.07, 0.07, 0.006, 18, 1, false, -Math.PI / 2, Math.PI),
+      new THREE.MeshStandardMaterial({ color: "#1b1d20", roughness: 0.4 }),
+    );
     peak.position.set(0, 0.004, 0.122 * 1.1 - 0.014);
     peak.rotation.x = 0.3;
     peak.scale.z = 0.8;
@@ -170,7 +179,10 @@ function ScooterTraffic({ scooters }: { scooters: readonly Vehicle[] }) {
       })),
     [],
   );
-  const poolMat = useMemo(() => new THREE.MeshBasicMaterial({ map: poolTexture(), transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, opacity: 0 }), []);
+  const poolMat = useMemo(
+    () => new THREE.MeshBasicMaterial({ map: poolTexture(), transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, opacity: 0 }),
+    [],
+  );
   const camera = useThree((s) => s.camera);
 
   useFrame(() => {
@@ -407,7 +419,12 @@ function Cat() {
           </mesh>
           {earPair(0.065, dark)}
         </group>
-        {[[0.12, 0.05], [0.12, -0.05], [-0.12, 0.05], [-0.12, -0.05]].map(([x, z], i) => (
+        {[
+          [0.12, 0.05],
+          [0.12, -0.05],
+          [-0.12, 0.05],
+          [-0.12, -0.05],
+        ].map(([x, z], i) => (
           <group key={i} ref={(g) => void (legs.current[i] = g)} position={[x!, 0.19, z!]}>
             <mesh position={[0, -0.095, 0]} material={i < 2 ? fur : dark} castShadow>
               <cylinderGeometry args={[0.017, 0.014, 0.19, 6]} />
@@ -432,7 +449,11 @@ function Leaves() {
   const leaves = useMemo(
     () =>
       Array.from({ length: LEAVES }, () => ({
-        p: new THREE.Vector3(LEAF_AREA.minX + random() * (LEAF_AREA.maxX - LEAF_AREA.minX), random() * LEAF_AREA.top, LEAF_AREA.minZ + random() * (LEAF_AREA.maxZ - LEAF_AREA.minZ)),
+        p: new THREE.Vector3(
+          LEAF_AREA.minX + random() * (LEAF_AREA.maxX - LEAF_AREA.minX),
+          random() * LEAF_AREA.top,
+          LEAF_AREA.minZ + random() * (LEAF_AREA.maxZ - LEAF_AREA.minZ),
+        ),
         spin: random() * 6,
         rest: 0,
         phase: random() * 10,

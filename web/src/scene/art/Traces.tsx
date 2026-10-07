@@ -21,7 +21,10 @@ export function Traces() {
   const butts = useRef<THREE.InstancedMesh>(null!);
   const cups = useRef<THREE.InstancedMesh>(null!);
   const last = useRef<{ at: number; sessions: unknown }>({ at: -Infinity, sessions: null });
-  const m = useMemo(() => ({ mat: new THREE.Matrix4(), q: new THREE.Quaternion(), e: new THREE.Euler(), p: new THREE.Vector3(), s: new THREE.Vector3(1, 1, 1) }), []);
+  const m = useMemo(
+    () => ({ mat: new THREE.Matrix4(), q: new THREE.Quaternion(), e: new THREE.Euler(), p: new THREE.Vector3(), s: new THREE.Vector3(1, 1, 1) }),
+    [],
+  );
 
   useFrame(() => {
     const st = useApp.getState();
@@ -55,7 +58,11 @@ export function Traces() {
         cups.current.setMatrixAt(cup++, m.mat);
       }
     }
-    for (const [mesh, n] of [[trays.current, tray], [butts.current, butt], [cups.current, cup]] as const) {
+    for (const [mesh, n] of [
+      [trays.current, tray],
+      [butts.current, butt],
+      [cups.current, cup],
+    ] as const) {
       mesh.count = n;
       mesh.instanceMatrix.needsUpdate = true;
       mesh.computeBoundingSphere();

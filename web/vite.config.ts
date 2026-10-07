@@ -17,7 +17,7 @@ const webPort = Number(process.env.PARKIRAN_WEB_PORT ?? env.PARKIRAN_WEB_PORT ??
 export default defineConfig({
   plugins: [react()],
   // Bun's isolated installs can hand R3F its own React/three copy; one instance of each is required.
-  resolve: { dedupe: ["react", "react-dom", "three", "@react-three/fiber"] },
+  resolve: { dedupe: ["react", "react-dom", "three", "@react-three/fiber", "zustand"] },
   // Pre-bundle everything in one pass; a second discovery pass would load a second React copy.
   optimizeDeps: {
     include: [
@@ -39,8 +39,15 @@ export default defineConfig({
       "zustand",
     ],
   },
-  define: { __PARKIRAN_SERVER_PORT__: JSON.stringify(serverPort) },
-  server: { host: "127.0.0.1", port: webPort, strictPort: true, fs: { allow: [root] } },
+  // The page always opens its WebSocket on its own origin (`/ws`): in production the server serves the page, in dev
+  // Vite proxies `/ws` to the server. Nothing about the server port is baked into the build.
+  server: {
+    host: "127.0.0.1",
+    port: webPort,
+    strictPort: true,
+    fs: { allow: [root] },
+    proxy: { "/ws": { target: `ws://127.0.0.1:${serverPort}`, ws: true, changeOrigin: true } },
+  },
   preview: { host: "127.0.0.1", port: webPort, strictPort: true },
   // ez-tree (lazy-loaded, textures inlined) is a 4 MB chunk by itself.
   build: { target: "es2022", sourcemap: false, chunkSizeWarningLimit: 4200 },

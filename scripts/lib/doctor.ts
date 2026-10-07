@@ -147,7 +147,5 @@ export async function checkHealth(port: number, fetchImpl: typeof fetch = fetch)
 }
 
 export function checkWebBuild(indexPath: string, exists: (path: string) => boolean = existsSync): Check {
-  return exists(indexPath)
-    ? check("ok", "web", `${indexPath} exists`)
-    : check("warn", "web", `${indexPath} is missing (bun run web:build)`);
+  return exists(indexPath) ? check("ok", "web", `${indexPath} exists`) : check("warn", "web", `${indexPath} is missing (bun run web:build)`);
 }

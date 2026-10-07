@@ -5,7 +5,16 @@ import type { PublicSession } from "../../../../shared/src/protocol.ts";
 import { SEATS } from "../../../../shared/src/seats.ts";
 import { MOOD_COLOR, sessionName, stateLabel } from "../../hud/labels.ts";
 import { serverNow, useApp } from "../../state/store.ts";
-import { SEAT_PLACES, WARUNG_STOOLS, assignStandingSpots, assignWarungStools, nearestStandingSpot, standingSpotFor, type StandingSpot, type Vec2 } from "../layout.ts";
+import {
+  SEAT_PLACES,
+  WARUNG_STOOLS,
+  assignStandingSpots,
+  assignWarungStools,
+  nearestStandingSpot,
+  standingSpotFor,
+  type StandingSpot,
+  type Vec2,
+} from "../layout.ts";
 import { Brain, type Home, type Target } from "./brain.ts";
 import { hash32, lookFor, type Look } from "./identity.ts";
 import { PakJoko, warungCounter } from "./PakJoko.tsx";
@@ -114,7 +123,9 @@ function chatPairs(bySeat: ReadonlyMap<string, Entry>, now: number): Map<string,
 
 /** Someone just sat down next to others: they wave at each other. */
 function greet(arrived: Entry, bySeat: ReadonlyMap<string, Entry>): void {
-  const near = (NEIGHBOURS.get(arrived.homeKey) ?? []).map((n) => bySeat.get(n)).filter((e): e is Entry => e !== undefined && e.brain.state.posture === "seated");
+  const near = (NEIGHBOURS.get(arrived.homeKey) ?? [])
+    .map((n) => bySeat.get(n))
+    .filter((e): e is Entry => e !== undefined && e.brain.state.posture === "seated");
   if (near.length === 0) return;
   arrived.brain.react("wave");
   for (const e of near) e.brain.react("wave");
@@ -238,7 +249,16 @@ export function Characters() {
         const atHome = initialIds.current!.has(sessionId) && (agentId === null || target.kind !== "gone");
         const smoke: SmokeSource = { active: false, world: new THREE.Vector3(), kind: "smoke" };
         const steam: SmokeSource = { active: false, world: new THREE.Vector3(), kind: "steam" };
-        e = { key, sessionId, agentId, look, homeKey: home.key, smoke, steam, brain: new Brain({ seed: look.seed, home: home.home, atHome, target, habit: look.habit }) };
+        e = {
+          key,
+          sessionId,
+          agentId,
+          look,
+          homeKey: home.key,
+          smoke,
+          steam,
+          brain: new Brain({ seed: look.seed, home: home.home, atHome, target, habit: look.habit }),
+        };
         entries.current.set(key, e);
         smokeSources.set(`${key}:smoke`, smoke);
         smokeSources.set(`${key}:steam`, steam);

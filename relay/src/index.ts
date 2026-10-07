@@ -42,10 +42,7 @@ async function main(): Promise<void> {
 
   const event = buildIngestEvent(raw, spawnedAt, (cwd) => readRepoInfo(cwd, config.gitPath));
   if (config.raw) {
-    appendLog(
-      "raw-events.jsonl",
-      JSON.stringify({ at: new Date(spawnedAt).toISOString(), shape: describeRawEvent(raw), forwarded: event }),
-    );
+    appendLog("raw-events.jsonl", JSON.stringify({ at: new Date(spawnedAt).toISOString(), shape: describeRawEvent(raw), forwarded: event }));
   }
   if (event === null) return debug("dropped: unknown event or missing session_id");
   if (config.token === null) return debug("dropped: PARKIRAN_TOKEN missing in .env");

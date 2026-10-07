@@ -75,8 +75,7 @@ export function describeRawEvent(raw: unknown): Record<string, Shape> {
       continue;
     }
     const safe = SAFE_VALUE_KEYS.has(k) || extra?.has(k) === true;
-    const showValue =
-      safe && (typeof v === "boolean" || typeof v === "number" || (typeof v === "string" && SAFE_VALUE_RE.test(v)));
+    const showValue = safe && (typeof v === "boolean" || typeof v === "number" || (typeof v === "string" && SAFE_VALUE_RE.test(v)));
     out[k] = showValue ? (v as string | number | boolean) : describeShape(v, 1);
   }
   return out;

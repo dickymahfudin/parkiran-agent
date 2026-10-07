@@ -76,11 +76,13 @@ function Cart({ kind, lamp }: { kind: CartKind; lamp: React.RefObject<THREE.Mesh
       <mesh position={[0, 1.27, -0.12]} material={MAT.glass}>
         <boxGeometry args={[0.56, 0.38, 0.8]} />
       </mesh>
-      {[-1, 1].flatMap((a) => [-1, 1].map((b) => (
-        <mesh key={`${a}${b}`} position={[a * 0.27, 1.45, b * 0.53]} material={MAT.steel}>
-          <cylinderGeometry args={[0.012, 0.012, 0.75, 6]} />
-        </mesh>
-      )))}
+      {[-1, 1].flatMap((a) =>
+        [-1, 1].map((b) => (
+          <mesh key={`${a}${b}`} position={[a * 0.27, 1.45, b * 0.53]} material={MAT.steel}>
+            <cylinderGeometry args={[0.012, 0.012, 0.75, 6]} />
+          </mesh>
+        )),
+      )}
       <mesh position={[0, 1.84, 0]} rotation={[0.05, 0, 0]} material={MAT.tin} castShadow>
         <boxGeometry args={[0.72, 0.015, LENGTH + 0.2]} />
       </mesh>

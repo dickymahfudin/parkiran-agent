@@ -1,6 +1,6 @@
 import { useMemo } from "react";
 import * as THREE from "three";
-import { CARS, COVERED_CAR, PARKED_SCOOTERS } from "../layout.ts";
+import { CAR_HALF_LENGTH, CARS, COVERED_CAR, PARKED_SCOOTERS } from "../layout.ts";
 import { canvasTexture, useModel } from "./assets.tsx";
 import { curve, loftGeometry, loftPoint, stations, type LoftSpec } from "./loft.ts";
 
@@ -28,18 +28,58 @@ interface CarModel {
 // Silhouettes of the two most common kinds of car in a kampung parking lot: a compact sedan and a city hatch.
 const MODELS: Record<"sedan" | "hatch", CarModel> = {
   sedan: {
-    half: 2.225,
+    half: CAR_HALF_LENGTH.sedan,
     wheelZ: [1.36, -1.3],
     wheelR: 0.31,
     track: 0.75,
-    top: [[-2.225, 0.5], [-2.17, 0.78], [-2.05, 0.95], [-1.85, 1.0], [-1.3, 1.01], [0.55, 0.99], [1.2, 0.88], [1.9, 0.79], [2.12, 0.72], [2.225, 0.5]],
-    base: [[-2.225, 0.38], [-2.0, 0.29], [-1.75, 0.21], [1.8, 0.21], [2.02, 0.27], [2.225, 0.36]],
-    width: [[-2.225, 0.64], [-2.15, 0.79], [-1.95, 0.855], [-1.2, 0.875], [1.2, 0.875], [1.9, 0.85], [2.12, 0.77], [2.225, 0.6]],
+    top: [
+      [-2.225, 0.5],
+      [-2.17, 0.78],
+      [-2.05, 0.95],
+      [-1.85, 1.0],
+      [-1.3, 1.01],
+      [0.55, 0.99],
+      [1.2, 0.88],
+      [1.9, 0.79],
+      [2.12, 0.72],
+      [2.225, 0.5],
+    ],
+    base: [
+      [-2.225, 0.38],
+      [-2.0, 0.29],
+      [-1.75, 0.21],
+      [1.8, 0.21],
+      [2.02, 0.27],
+      [2.225, 0.36],
+    ],
+    width: [
+      [-2.225, 0.64],
+      [-2.15, 0.79],
+      [-1.95, 0.855],
+      [-1.2, 0.875],
+      [1.2, 0.875],
+      [1.9, 0.85],
+      [2.12, 0.77],
+      [2.225, 0.6],
+    ],
     cabin: {
       from: -1.42,
       to: 0.6,
-      top: [[-1.42, 0.97], [-1.15, 1.2], [-0.8, 1.39], [-0.5, 1.45], [0.0, 1.46], [0.2, 1.42], [0.6, 0.96]],
-      width: [[-1.42, 0.72], [-0.9, 0.78], [0.2, 0.79], [0.6, 0.74]],
+      top: [
+        [-1.42, 0.97],
+        [-1.15, 1.2],
+        [-0.8, 1.39],
+        [-0.5, 1.45],
+        [0.0, 1.46],
+        [0.2, 1.42],
+        [0.6, 0.96],
+      ],
+      width: [
+        [-1.42, 0.72],
+        [-0.9, 0.78],
+        [0.2, 0.79],
+        [0.6, 0.74],
+      ],
       taper: 0.22,
     },
     roof: [-0.74, 0.24],
@@ -51,18 +91,56 @@ const MODELS: Record<"sedan" | "hatch", CarModel> = {
     rearPlateY: 0.62,
   },
   hatch: {
-    half: 1.9,
+    half: CAR_HALF_LENGTH.hatch,
     wheelZ: [1.18, -1.22],
     wheelR: 0.3,
     track: 0.71,
-    top: [[-1.9, 0.6], [-1.86, 0.86], [-1.78, 0.97], [-1.6, 1.0], [0.42, 0.98], [0.95, 0.88], [1.55, 0.79], [1.78, 0.73], [1.9, 0.52]],
-    base: [[-1.9, 0.4], [-1.72, 0.3], [-1.5, 0.21], [1.5, 0.21], [1.7, 0.27], [1.9, 0.36]],
-    width: [[-1.9, 0.66], [-1.82, 0.78], [-1.6, 0.83], [1.2, 0.835], [1.62, 0.81], [1.8, 0.74], [1.9, 0.58]],
+    top: [
+      [-1.9, 0.6],
+      [-1.86, 0.86],
+      [-1.78, 0.97],
+      [-1.6, 1.0],
+      [0.42, 0.98],
+      [0.95, 0.88],
+      [1.55, 0.79],
+      [1.78, 0.73],
+      [1.9, 0.52],
+    ],
+    base: [
+      [-1.9, 0.4],
+      [-1.72, 0.3],
+      [-1.5, 0.21],
+      [1.5, 0.21],
+      [1.7, 0.27],
+      [1.9, 0.36],
+    ],
+    width: [
+      [-1.9, 0.66],
+      [-1.82, 0.78],
+      [-1.6, 0.83],
+      [1.2, 0.835],
+      [1.62, 0.81],
+      [1.8, 0.74],
+      [1.9, 0.58],
+    ],
     cabin: {
       from: -1.84,
       to: 0.5,
-      top: [[-1.84, 0.96], [-1.8, 1.25], [-1.7, 1.42], [-1.4, 1.48], [0.0, 1.5], [0.15, 1.46], [0.5, 0.96]],
-      width: [[-1.84, 0.7], [-1.5, 0.76], [0.15, 0.77], [0.5, 0.72]],
+      top: [
+        [-1.84, 0.96],
+        [-1.8, 1.25],
+        [-1.7, 1.42],
+        [-1.4, 1.48],
+        [0.0, 1.5],
+        [0.15, 1.46],
+        [0.5, 0.96],
+      ],
+      width: [
+        [-1.84, 0.7],
+        [-1.5, 0.76],
+        [0.15, 0.77],
+        [0.5, 0.72],
+      ],
       taper: 0.2,
     },
     roof: [-1.64, 0.18],
@@ -126,16 +204,20 @@ function carSpecs(m: CarModel) {
     around: 36,
     caps: true,
   };
-  const patch = (from: number, to: number, arc: readonly [number, number]): LoftSpec => ({ ...cabin, zs: stations(from, to, 0.04), arc, inflate: 0.006, caps: false, around: 14 });
+  const patch = (from: number, to: number, arc: readonly [number, number]): LoftSpec => ({
+    ...cabin,
+    zs: stations(from, to, 0.04),
+    arc,
+    inflate: 0.006,
+    caps: false,
+    around: 14,
+  });
   const q = Math.PI / 4;
   return {
     body,
     cabin,
     roof: patch(m.roof[0], m.roof[1], [q - 0.12, Math.PI - q + 0.12]),
-    pillars: [
-      patch(m.cPillar[0], m.cPillar[1], [-0.15, q + 0.1]),
-      patch(m.cPillar[0], m.cPillar[1], [Math.PI - q - 0.1, Math.PI + 0.15]),
-    ],
+    pillars: [patch(m.cPillar[0], m.cPillar[1], [-0.15, q + 0.1]), patch(m.cPillar[0], m.cPillar[1], [Math.PI - q - 0.1, Math.PI + 0.15])],
     bPillars: [
       patch(m.bPillar - 0.045, m.bPillar + 0.045, [-0.15, q + 0.05]),
       patch(m.bPillar - 0.045, m.bPillar + 0.045, [Math.PI - q - 0.05, Math.PI + 0.15]),
@@ -198,7 +280,16 @@ function rimTexture(spokes: number): THREE.CanvasTexture {
 }
 
 const tireProfile = (r: number, w: number) =>
-  [[0.68, -0.48], [0.87, -0.5], [0.97, -0.44], [1, -0.3], [1, 0.3], [0.97, 0.44], [0.87, 0.5], [0.68, 0.48]].map(([a, b]) => new THREE.Vector2(a! * r, b! * w));
+  [
+    [0.68, -0.48],
+    [0.87, -0.5],
+    [0.97, -0.44],
+    [1, -0.3],
+    [1, 0.3],
+    [0.97, 0.44],
+    [0.87, 0.5],
+    [0.68, 0.48],
+  ].map(([a, b]) => new THREE.Vector2(a! * r, b! * w));
 
 function useWheelParts(r: number, width: number, spokes: number) {
   return useMemo(() => {
@@ -324,16 +415,50 @@ export function Car({ x, z, yaw, color, model, plate, groupRef, lens = MAT.lens,
 }
 
 /** Honda-Beat-style matic scooter, parked on its side stand. */
-export function Scooter({ x, z, yaw, color, plate, lens = MAT.lens, tail = MAT.tail, parked = true }: { x: number; z: number; yaw: number; color: string; plate: string; lens?: THREE.Material; tail?: THREE.Material; parked?: boolean }) {
+export function Scooter({
+  x,
+  z,
+  yaw,
+  color,
+  plate,
+  lens = MAT.lens,
+  tail = MAT.tail,
+  parked = true,
+}: {
+  x: number;
+  z: number;
+  yaw: number;
+  color: string;
+  plate: string;
+  lens?: THREE.Material;
+  tail?: THREE.Material;
+  parked?: boolean;
+}) {
   const parts = useMemo(() => {
     const paint = paintMaterial(color, 0.35);
     const solid = new THREE.MeshPhysicalMaterial({ color, metalness: 0.35, roughness: 0.3, clearcoat: 1, clearcoatRoughness: 0.06 });
     const white = () => (_z: number, _y: number, _t: number, out: THREE.Color) => void out.setRGB(1, 1, 1);
     const rear = loftGeometry({
       zs: stations(-0.82, 0.08, 0.03),
-      bottom: curve([[-0.82, 0.5], [-0.6, 0.36], [-0.3, 0.3], [0.08, 0.28]]),
-      top: curve([[-0.82, 0.6], [-0.7, 0.66], [-0.3, 0.7], [0.0, 0.68], [0.08, 0.6]]),
-      halfWidth: curve([[-0.82, 0.06], [-0.7, 0.12], [-0.3, 0.165], [0.08, 0.15]]),
+      bottom: curve([
+        [-0.82, 0.5],
+        [-0.6, 0.36],
+        [-0.3, 0.3],
+        [0.08, 0.28],
+      ]),
+      top: curve([
+        [-0.82, 0.6],
+        [-0.7, 0.66],
+        [-0.3, 0.7],
+        [0.0, 0.68],
+        [0.08, 0.6],
+      ]),
+      halfWidth: curve([
+        [-0.82, 0.06],
+        [-0.7, 0.12],
+        [-0.3, 0.165],
+        [0.08, 0.15],
+      ]),
       exponent: 3.2,
       caps: true,
       color: white(),
@@ -342,16 +467,33 @@ export function Scooter({ x, z, yaw, color, plate, lens = MAT.lens, tail = MAT.t
       zs: stations(-0.02, 0.44, 0.04),
       bottom: () => 0.25,
       top: () => 0.36,
-      halfWidth: curve([[-0.02, 0.14], [0.2, 0.16], [0.44, 0.17]]),
+      halfWidth: curve([
+        [-0.02, 0.14],
+        [0.2, 0.16],
+        [0.44, 0.17],
+      ]),
       exponent: 6,
       caps: true,
       color: (_z, y, _t, out) => void out.setRGB(...((y > 0.35 ? [0.12, 0.12, 0.12] : [1, 1, 1]) as [number, number, number])),
     });
     const front = loftGeometry({
       zs: stations(0.36, 0.7, 0.025),
-      bottom: curve([[0.36, 0.3], [0.5, 0.32], [0.7, 0.58]]),
-      top: curve([[0.36, 0.6], [0.43, 0.9], [0.55, 0.99], [0.7, 0.9]]),
-      halfWidth: curve([[0.36, 0.17], [0.5, 0.205], [0.7, 0.11]]),
+      bottom: curve([
+        [0.36, 0.3],
+        [0.5, 0.32],
+        [0.7, 0.58],
+      ]),
+      top: curve([
+        [0.36, 0.6],
+        [0.43, 0.9],
+        [0.55, 0.99],
+        [0.7, 0.9],
+      ]),
+      halfWidth: curve([
+        [0.36, 0.17],
+        [0.5, 0.205],
+        [0.7, 0.11],
+      ]),
       exponent: 3.5,
       caps: true,
       color: white(),
@@ -359,8 +501,19 @@ export function Scooter({ x, z, yaw, color, plate, lens = MAT.lens, tail = MAT.t
     const seat = loftGeometry({
       zs: stations(-0.72, 0.02, 0.03),
       bottom: () => 0.66,
-      top: curve([[-0.72, 0.71], [-0.62, 0.79], [-0.25, 0.8], [-0.05, 0.82], [0.02, 0.74]]),
-      halfWidth: curve([[-0.72, 0.07], [-0.55, 0.13], [-0.1, 0.145], [0.02, 0.12]]),
+      top: curve([
+        [-0.72, 0.71],
+        [-0.62, 0.79],
+        [-0.25, 0.8],
+        [-0.05, 0.82],
+        [0.02, 0.74],
+      ]),
+      halfWidth: curve([
+        [-0.72, 0.07],
+        [-0.55, 0.13],
+        [-0.1, 0.145],
+        [0.02, 0.12],
+      ]),
       exponent: 3,
       caps: true,
     });

@@ -87,7 +87,12 @@ describe("the street is clear for traffic", () => {
   const POLE_R = 0.14;
   const TRUNK_R = 0.35;
   const bands = ([0, 1] as const).flatMap((lane) =>
-    (["car", "scooter"] as const).map((kind) => ({ lane, kind, min: laneX(lane, kind) - FOOTPRINT[kind].halfWidth, max: laneX(lane, kind) + FOOTPRINT[kind].halfWidth })),
+    (["car", "scooter"] as const).map((kind) => ({
+      lane,
+      kind,
+      min: laneX(lane, kind) - FOOTPRINT[kind].halfWidth,
+      max: laneX(lane, kind) + FOOTPRINT[kind].halfWidth,
+    })),
   );
   const gap = (x: number, b: { min: number; max: number }) => Math.max(b.min - x, x - b.max);
 

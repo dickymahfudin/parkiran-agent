@@ -56,7 +56,10 @@ export function reachLeg(upLeg: THREE.Object3D, leg: THREE.Object3D, foot: THREE
   pole.normalize();
   const cos = (thigh * thigh + dist * dist - shin * shin) / (2 * thigh * dist);
   const sin = Math.sqrt(Math.max(0, 1 - cos * cos));
-  const kneeTo = v.knee.copy(hip).addScaledVector(dir, cos * thigh).addScaledVector(pole, sin * thigh);
+  const kneeTo = v.knee
+    .copy(hip)
+    .addScaledVector(dir, cos * thigh)
+    .addScaledVector(pole, sin * thigh);
   const end = v.end.copy(hip).addScaledVector(dir, dist);
   aim(upLeg, hip, knee, kneeTo);
   aim(leg, leg.getWorldPosition(v.b), foot.getWorldPosition(v.c), end);
@@ -73,7 +76,14 @@ const EXTENSION = 0.94;
  * Where the ankle goes when the seat is `drop` higher than the clip's: straight down by `drop`, and pulled back under the
  * hip only as far as the leg (`legLength` = thigh + shin) needs to reach it. `forward` is the horizontal facing (unit).
  */
-export function loweredAnkle(hip: THREE.Vector3, ankle: THREE.Vector3, drop: number, forward: THREE.Vector3, legLength: number, out: THREE.Vector3): THREE.Vector3 {
+export function loweredAnkle(
+  hip: THREE.Vector3,
+  ankle: THREE.Vector3,
+  drop: number,
+  forward: THREE.Vector3,
+  legLength: number,
+  out: THREE.Vector3,
+): THREE.Vector3 {
   out.copy(ankle);
   out.y -= drop;
   const dx = out.x - hip.x;

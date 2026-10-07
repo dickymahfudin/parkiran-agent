@@ -23,9 +23,26 @@ const decode = async (buf: Uint8Array) => {
   return { width: info.width, height: info.height, data: new Uint8Array(data) };
 };
 
-const COLOR = { enableDebug: false, isUASTC: false, qualityLevel: 160, compressionLevel: 2, isPerceptual: true, generateMipmap: true, imageDecoder: decode } as const;
+const COLOR = {
+  enableDebug: false,
+  isUASTC: false,
+  qualityLevel: 160,
+  compressionLevel: 2,
+  isPerceptual: true,
+  generateMipmap: true,
+  imageDecoder: decode,
+} as const;
 const DATA = { ...COLOR, isPerceptual: false } as const;
-const NORMAL = { enableDebug: false, isUASTC: true, uastcLDRQualityLevel: 1, needSupercompression: true, isNormalMap: true, isPerceptual: false, generateMipmap: true, imageDecoder: decode } as const;
+const NORMAL = {
+  enableDebug: false,
+  isUASTC: true,
+  uastcLDRQualityLevel: 1,
+  needSupercompression: true,
+  isNormalMap: true,
+  isPerceptual: false,
+  generateMipmap: true,
+  imageDecoder: decode,
+} as const;
 
 await MeshoptEncoder.ready;
 await MeshoptDecoder.ready;
@@ -79,8 +96,15 @@ async function buildTexture(id: string, size: number): Promise<void> {
   const dir = join(OUT, "textures", id);
   mkdirSync(dir, { recursive: true });
   let bytes = 0;
-  for (const [name, opts] of [["diff", COLOR], ["nor", NORMAL], ["arm", DATA]] as const) {
-    const resized = await sharp(readFileSync(join(RAW, "textures", id, `${name}.jpg`))).resize(size, size).png().toBuffer();
+  for (const [name, opts] of [
+    ["diff", COLOR],
+    ["nor", NORMAL],
+    ["arm", DATA],
+  ] as const) {
+    const resized = await sharp(readFileSync(join(RAW, "textures", id, `${name}.jpg`)))
+      .resize(size, size)
+      .png()
+      .toBuffer();
     const out = await encodeToKTX2(new Uint8Array(resized), opts);
     writeFileSync(join(dir, `${name}.ktx2`), out);
     bytes += out.byteLength;
@@ -143,9 +167,7 @@ function writeCredits(): void {
   const manifestPath = join(RAW, "manifest.json");
   if (!existsSync(manifestPath)) throw new Error("run scripts/assets/fetch.ts first");
   const manifest = JSON.parse(readFileSync(manifestPath, "utf8")) as ManifestEntry[];
-  const rows = manifest
-    .map((m) => `| ${m.name} (\`${m.id}\`, ${m.kind}) | ${m.authors.join(", ")} | ${m.page} | CC0 |`)
-    .join("\n");
+  const rows = manifest.map((m) => `| ${m.name} (\`${m.id}\`, ${m.kind}) | ${m.authors.join(", ")} | ${m.page} | CC0 |`).join("\n");
   const credits = join(REPO_ROOT, "CREDITS.md");
   const text = readFileSync(credits, "utf8");
   const start = "<!-- polyhaven:start -->";

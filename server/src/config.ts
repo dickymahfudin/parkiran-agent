@@ -39,15 +39,15 @@ export function loadServerConfig(env: Record<string, string | undefined> = proce
   if (!token || token.length < 16) throw new ConfigError("PARKIRAN_TOKEN missing or too short in .env (run `bun run install-hooks`)");
   const port = num(get("PARKIRAN_PORT"), DEFAULT_PORT, 1, 65535, "PARKIRAN_PORT");
   const webPort = num(get("PARKIRAN_WEB_PORT"), DEFAULT_WEB_PORT, 1, 65535, "PARKIRAN_WEB_PORT");
-  const extra = (get("PARKIRAN_ALLOWED_ORIGINS") ?? "").split(",").map((o) => o.trim()).filter(Boolean);
+  const extra = (get("PARKIRAN_ALLOWED_ORIGINS") ?? "")
+    .split(",")
+    .map((o) => o.trim())
+    .filter(Boolean);
 
   return {
     token,
     port,
-    allowedOrigins: [
-      ...[port, webPort].flatMap((p) => [`http://127.0.0.1:${p}`, `http://localhost:${p}`]),
-      ...extra,
-    ],
+    allowedOrigins: [...[port, webPort].flatMap((p) => [`http://127.0.0.1:${p}`, `http://localhost:${p}`]), ...extra],
     lat: num(get("PARKIRAN_LAT"), -6.2, -90, 90, "PARKIRAN_LAT"),
     lon: num(get("PARKIRAN_LON"), 106.8, -180, 180, "PARKIRAN_LON"),
     reducer: {

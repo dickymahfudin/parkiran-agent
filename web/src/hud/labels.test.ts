@@ -45,7 +45,11 @@ describe("labels", () => {
   });
 
   test("milestones read as plain facts (the kopi joke stays) and never count as needing you", () => {
-    expect(cueLine({ kind: "milestone", sessionId: "s", milestone: "calls", value: 100 })).toEqual({ icon: "milestone", text: "100 tool calls", mood: "working" });
+    expect(cueLine({ kind: "milestone", sessionId: "s", milestone: "calls", value: 100 })).toEqual({
+      icon: "milestone",
+      text: "100 tool calls",
+      mood: "working",
+    });
     expect(cueLine({ kind: "milestone", sessionId: "s", milestone: "work", value: 2 }).text).toBe("2 h of work");
     expect(cueLine({ kind: "milestone", sessionId: "s", milestone: "compactions", value: 2 }).text).toBe("2nd compaction, kopi lagi");
   });
@@ -88,7 +92,10 @@ describe("labels", () => {
     const b = twin("b", 2);
     const other = twin("o", 0, "parkiran", "dev");
     let twins = assignTwinNumbers(new Map(), [b, a, other]);
-    expect([...twins]).toEqual([["a", 1], ["b", 2]]);
+    expect([...twins]).toEqual([
+      ["a", 1],
+      ["b", 2],
+    ]);
     expect(sessionName(a, twins)).toBe("parkiran");
     expect(sessionName(b, twins)).toBe("parkiran #2");
     expect(sessionName({ id: "o", project: "parkiran" }, twins)).toBe("parkiran");

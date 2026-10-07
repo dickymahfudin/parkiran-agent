@@ -42,7 +42,14 @@ function signTexture(): THREE.CanvasTexture {
 }
 
 function menuTexture(): THREE.CanvasTexture {
-  const items = [["KOPI HITAM", "5K"], ["KOPI SUSU", "7K"], ["TEH MANIS", "5K"], ["ES JERUK", "6K"], ["MIE REBUS", "10K"], ["GORENGAN", "1K"]];
+  const items = [
+    ["KOPI HITAM", "5K"],
+    ["KOPI SUSU", "7K"],
+    ["TEH MANIS", "5K"],
+    ["ES JERUK", "6K"],
+    ["MIE REBUS", "10K"],
+    ["GORENGAN", "1K"],
+  ];
   return canvasTexture(256, 384, (ctx) => {
     ctx.fillStyle = "#1f2a24";
     ctx.fillRect(0, 0, 256, 384);
@@ -204,11 +211,29 @@ export function Warung() {
   const tarpMat = useMemo(() => new THREE.MeshStandardMaterial({ color: "#2a62b8", roughness: 0.62, side: THREE.DoubleSide }), []);
   const signMat = useMemo(() => new THREE.MeshStandardMaterial({ map: signTexture(), roughness: 0.7 }), []);
   const menuMat = useMemo(() => new THREE.MeshStandardMaterial({ map: menuTexture(), roughness: 0.9 }), []);
-  const neonMat = useMemo(() => new THREE.MeshStandardMaterial({ map: neonTexture(), transparent: true, emissive: "#ff3d7f", emissiveMap: neonTexture(), emissiveIntensity: 0, color: "#ff8fb4", depthWrite: false }), []);
+  const neonMat = useMemo(
+    () =>
+      new THREE.MeshStandardMaterial({
+        map: neonTexture(),
+        transparent: true,
+        emissive: "#ff3d7f",
+        emissiveMap: neonTexture(),
+        emissiveIntensity: 0,
+        color: "#ff8fb4",
+        depthWrite: false,
+      }),
+    [],
+  );
   const bulbMat = useMemo(() => new THREE.MeshStandardMaterial({ color: "#fff3d6", emissive: "#ffcf8a", emissiveIntensity: 0 }), []);
   const tubeMat = useMemo(() => new THREE.MeshStandardMaterial({ color: "#f4f8ff", emissive: "#e8f1ff", emissiveIntensity: 0 }), []);
-  const fridgeMat = useMemo(() => new THREE.MeshStandardMaterial({ color: "#d9eef7", emissive: "#bfe6ff", emissiveIntensity: 0, transparent: true, opacity: 0.55, roughness: 0.1 }), []);
-  const glassMat = useMemo(() => new THREE.MeshPhysicalMaterial({ color: "#dfeff2", transparent: true, opacity: 0.22, roughness: 0.05, metalness: 0, depthWrite: false }), []);
+  const fridgeMat = useMemo(
+    () => new THREE.MeshStandardMaterial({ color: "#d9eef7", emissive: "#bfe6ff", emissiveIntensity: 0, transparent: true, opacity: 0.55, roughness: 0.1 }),
+    [],
+  );
+  const glassMat = useMemo(
+    () => new THREE.MeshPhysicalMaterial({ color: "#dfeff2", transparent: true, opacity: 0.22, roughness: 0.05, metalness: 0, depthWrite: false }),
+    [],
+  );
   const tarpGeo = useMemo(() => tarpGeometry(DEPTH + 0.3, Math.hypot(FRONT_X - WARUNG.awningX + 0.3, AWNING_Y_WALL - AWNING_Y_EDGE)), []);
 
   // Under the warung roof and awning, in their shade already: these small things cast no shadow of their own.

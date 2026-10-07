@@ -95,7 +95,15 @@ class Actor {
   }
 
   async work(cycles: number): Promise<void> {
-    const tools: [string, number][] = [["Read", 600], ["Grep", 500], ["Glob", 300], ["Edit", 1200], ["Bash", 3500], ["Read", 700], ["Write", 900]];
+    const tools: [string, number][] = [
+      ["Read", 600],
+      ["Grep", 500],
+      ["Glob", 300],
+      ["Edit", 1200],
+      ["Bash", 3500],
+      ["Read", 700],
+      ["Write", 900],
+    ];
     for (let i = 0; i < cycles; i++) {
       const [name, ms] = tools[Math.floor(Math.random() * tools.length)]!;
       await this.tool(name, ms);
@@ -139,7 +147,12 @@ class Actor {
   async subagents(types: string[], toolsEach: number): Promise<void> {
     const parentTool = newToolId();
     await this.emit("PreToolUse", { toolName: "Agent", toolUseId: parentTool });
-    const ids = types.map((t, i) => ({ agentId: `a${sessionIdFor(this.name + i).replace(/-/g, "").slice(0, 16)}`, agentType: t }));
+    const ids = types.map((t, i) => ({
+      agentId: `a${sessionIdFor(this.name + i)
+        .replace(/-/g, "")
+        .slice(0, 16)}`,
+      agentType: t,
+    }));
     for (const a of ids) {
       await this.emit("SubagentStart", a);
       await sleep(800);

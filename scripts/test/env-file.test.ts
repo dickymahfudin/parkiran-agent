@@ -22,8 +22,6 @@ describe("PARKIRAN_GIT shim guard", () => {
   test("an existing PARKIRAN_GIT is never overwritten", () => {
     const additions = planEnvAdditions("PARKIRAN_TOKEN=x\nPARKIRAN_PORT=1\nPARKIRAN_GIT=/my/git\n", "/usr/bin/git");
     expect(additions).toEqual([]);
-    expect(applyEnvAdditions("A=1", [{ key: "PARKIRAN_GIT", value: "/usr/bin/git", display: "/usr/bin/git" }])).toBe(
-      "A=1\nPARKIRAN_GIT=/usr/bin/git\n",
-    );
+    expect(applyEnvAdditions("A=1", [{ key: "PARKIRAN_GIT", value: "/usr/bin/git", display: "/usr/bin/git" }])).toBe("A=1\nPARKIRAN_GIT=/usr/bin/git\n");
   });
 });

@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { SEAT_PLACES } from "../layout.ts";
+import { BENCH_Y, SEAT_PLACES } from "../layout.ts";
 import { BUTT_EVERY_MS, MAX_BUTTS, MAX_CUPS, traceCounts, traceSpot } from "./traces.ts";
 
 describe("traces by the seat", () => {
@@ -15,7 +15,7 @@ describe("traces by the seat", () => {
       expect(spot).not.toBeNull();
       const [x, y, z] = spot.at;
       expect(Math.hypot(x - seat.hip[0], z - seat.hip[2])).toBeGreaterThan(0.3);
-      expect(y).toBe(seat.style === "bench" ? 0.47 : 0);
+      expect(y).toBe(seat.style === "bench" ? BENCH_Y : 0);
     }
     expect(traceSpot("nope")).toBeNull();
   });

@@ -182,7 +182,7 @@ describe("doctor CLI", () => {
     rmSync(settings);
     const missing = await run("doctor.ts", "", settings, env);
     expect(missing.code).toBe(1);
-    expect(missing.out).toMatch(/^fail  settings/m);
+    expect(missing.out).toMatch(/^fail {2}settings/m);
   });
 });
 

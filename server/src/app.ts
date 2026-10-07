@@ -25,8 +25,7 @@ function tokenMatches(given: string | null, expected: string): boolean {
   return a.length === b.length && timingSafeEqual(a, b);
 }
 
-const text = (status: number, body: string): Response =>
-  new Response(body, { status, headers: { "content-type": "text/plain; charset=utf-8" } });
+const text = (status: number, body: string): Response => new Response(body, { status, headers: { "content-type": "text/plain; charset=utf-8" } });
 
 export function createApp({ config, store, usage, log }: AppDeps) {
   // Normalised once: a trailing slash in PARKIRAN_STATIC_DIR would otherwise fail the containment check below.

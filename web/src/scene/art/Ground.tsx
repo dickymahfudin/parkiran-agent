@@ -93,7 +93,10 @@ function Lines() {
 function Stains() {
   const tex = useMemo(() => [stainTexture(3), stainTexture(9), stainTexture(21)], []);
   const mats = useMemo(
-    () => tex.map((map) => new THREE.MeshStandardMaterial({ map, transparent: true, depthWrite: false, roughness: 0.35, polygonOffset: true, polygonOffsetFactor: -1 })),
+    () =>
+      tex.map(
+        (map) => new THREE.MeshStandardMaterial({ map, transparent: true, depthWrite: false, roughness: 0.35, polygonOffset: true, polygonOffsetFactor: -1 }),
+      ),
     [tex],
   );
   const spots: [number, number, number, number][] = [

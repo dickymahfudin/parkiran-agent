@@ -35,7 +35,11 @@ function run(cmd: string[]): string {
 
 function pack(): void {
   if (!existsSync(ASSETS)) throw new Error("web/public/assets is missing; run `bun run assets` first");
-  const files = Object.fromEntries(walk(ASSETS).sort().map((p) => [relative(PUBLIC, p), sha256(readFileSync(p))]));
+  const files = Object.fromEntries(
+    walk(ASSETS)
+      .sort()
+      .map((p) => [relative(PUBLIC, p), sha256(readFileSync(p))]),
+  );
   const previous = existsSync(MANIFEST) ? (JSON.parse(readFileSync(MANIFEST, "utf8")) as Manifest) : null;
   if (previous && existsSync(ARCHIVE) && JSON.stringify(previous.files) === JSON.stringify(files)) {
     console.log("assets unchanged, archive kept");

@@ -13,3 +13,7 @@ assets/generated/
 # Generated web assets (rebuild: bun run assets)
 web/public/assets/
 web/public/basis/
+
+# Per-machine editor/agent state (absolute paths) and code indexes
+.claude/
+.codegraph/

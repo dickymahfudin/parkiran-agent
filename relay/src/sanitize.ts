@@ -37,8 +37,7 @@ export function buildIngestEvent(raw: unknown, ts: number, resolveRepo: RepoReso
   const sessionId = payload.session_id;
   if (!isId(sessionId)) return null;
 
-  const repo: RepoInfo =
-    typeof payload.cwd === "string" && payload.cwd.length > 0 ? resolveRepo(payload.cwd) : { project: null, branch: null };
+  const repo: RepoInfo = typeof payload.cwd === "string" && payload.cwd.length > 0 ? resolveRepo(payload.cwd) : { project: null, branch: null };
 
   const event: IngestEvent = {
     v: INGEST_VERSION,

@@ -2,6 +2,9 @@
   "name": "parkiran-agent",
   "private": true,
   "type": "module",
+  "engines": {
+    "bun": ">=1.4"
+  },
   "workspaces": [
     "shared",
     "relay",
@@ -10,6 +13,9 @@
   ],
   "scripts": {
     "test": "bun test",
+    "lint": "biome check .",
+    "lint:fix": "biome check --write .",
+    "format": "biome format --write .",
     "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p web/tsconfig.json --noEmit && tsc -p web/tsconfig.node.json --noEmit",
     "install-hooks": "bun scripts/install-hooks.ts",
     "uninstall-hooks": "bun scripts/uninstall-hooks.ts",
@@ -28,11 +34,12 @@
     "postinstall": "bun scripts/assets/archive.ts unpack"
   },
   "devDependencies": {
+    "@biomejs/biome": "2.4.0",
     "@gltf-transform/core": "4.5.1",
     "@gltf-transform/extensions": "4.5.1",
     "@gltf-transform/functions": "4.5.1",
     "@types/bun": "1.4.2",
-    "@types/suncalc": "^1.9.2",
+    "@types/suncalc": "1.9.2",
     "ktx2-encoder": "0.6.0",
     "meshoptimizer": "1.3.0",
     "sharp": "0.35.5",

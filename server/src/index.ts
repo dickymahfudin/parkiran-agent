@@ -1,5 +1,5 @@
 import { createApp } from "./app.ts";
-import { ConfigError, loadServerConfig } from "./config.ts";
+import { ConfigError, loadServerConfig, type ServerConfig } from "./config.ts";
 import { SessionStore } from "./store.ts";
 import { NoUsageSource } from "./usage.ts";
 
@@ -8,7 +8,7 @@ const TICK_INTERVAL_MS = 1000;
 
 const log = (msg: string): void => console.log(`${new Date().toISOString()} ${msg}`);
 
-let config;
+let config: ServerConfig;
 try {
   config = loadServerConfig();
 } catch (err) {
@@ -20,7 +20,7 @@ try {
 }
 
 const store = new SessionStore(config.reducer, log);
-let app;
+let app: ReturnType<typeof createApp>;
 try {
   app = createApp({ config, store, usage: new NoUsageSource(), log });
 } catch (err) {

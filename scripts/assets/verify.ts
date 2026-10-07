@@ -28,6 +28,7 @@ export function parseTarListing(plain: string, verbose: string): TarEntry[] {
 
 /** A relative path under `assets/` with no `..`, no absolute prefix and no control characters. */
 export function isSafeAssetPath(name: string): boolean {
+  // biome-ignore lint/suspicious/noControlCharactersInRegex: control characters in a tar entry name are rejected on purpose
   if (isAbsolute(name) || name.startsWith("\\") || /[\u0000-\u001f]/.test(name)) return false;
   const parts = name.split(/[\\/]/);
   return parts[0] === "assets" && parts.length > 1 && parts.every((p) => p !== "" && p !== "." && p !== "..");

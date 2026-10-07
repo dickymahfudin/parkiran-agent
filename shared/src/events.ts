@@ -100,6 +100,7 @@ const TOOL_NAME_RE = /^[A-Za-z0-9_.:-]{1,128}$/;
 const NOTIFICATION_TYPE_RE = /^[a-z][a-z0-9_]{0,63}$/;
 const AGENT_TYPE_RE = /^[A-Za-z0-9_.:-]{0,64}$/;
 // C0/C1 controls, zero-width and bidi override characters.
+// biome-ignore lint/suspicious/noControlCharactersInRegex: the control range is the point of this filter
 const UNSAFE_CHARS_RE = /[\u0000-\u001f\u007f-\u009f​-‏‪-‮⁦-⁩﻿]/g;
 
 export const MAX_PROJECT_LEN = 64;

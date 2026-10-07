@@ -20,10 +20,15 @@ export interface SmokeSource {
 }
 
 const MAX_PUFFS = 900;
+/**
+ * The pool holds this many smokers at full emission; with more, every kretek and exhale emits proportionally less
+ * (`crowdFactor`) instead of `spawn` silently dropping puffs once the pool is full.
+ */
+const FULL_RATE_SMOKERS = 10;
 const WISP_FRAMES = 4;
 
 /** Particle kinds: a thin stream off the tip, a cloud blown out of the mouth, steam off a cup. */
-const enum Kind {
+enum Kind {
   Tip = 0,
   Exhale = 1,
   Steam = 2,
@@ -141,6 +146,9 @@ void main() {
 
 const pick = ([lo, hi]: readonly [number, number]) => lo + Math.random() * (hi - lo);
 
+/** Scale on every smoker's tip and exhale rate: 1 up to FULL_RATE_SMOKERS lit at once, shrinking beyond so the pool never starves. */
+export const crowdFactor = (activeSmokers: number): number => Math.min(1, FULL_RATE_SMOKERS / Math.max(1, activeSmokers));
+
 /**
  * Every cigarette and cup in one draw: camera-facing wisps sorted back to front. Tip smoke leaves as a thin laminar
  * thread and breaks into curls as it rises; a drag dims it and the smoke comes back out of the mouth as a cloud
@@ -150,8 +158,19 @@ export function SmokeSystem({ sources }: { sources: Map<string, SmokeSource> }) 
   const puffs = useMemo<Puff[]>(
     () =>
       Array.from({ length: MAX_PUFFS }, () => ({
-        alive: false, kind: Kind.Tip, age: 0, life: 1, pos: new THREE.Vector3(), vel: new THREE.Vector3(),
-        size0: 0, size1: 0, alpha: 0, rot: 0, spin: 0, frame: 0, seed: 0,
+        alive: false,
+        kind: Kind.Tip,
+        age: 0,
+        life: 1,
+        pos: new THREE.Vector3(),
+        vel: new THREE.Vector3(),
+        size0: 0,
+        size1: 0,
+        alpha: 0,
+        rot: 0,
+        spin: 0,
+        frame: 0,
+        seed: 0,
       })),
     [],
   );
@@ -228,13 +247,16 @@ export function SmokeSystem({ sources }: { sources: Map<string, SmokeSource> }) 
     if (carry.current.size > sources.size * 2 + 8) {
       for (const key of carry.current.keys()) if (!sources.has(key.endsWith(":exhale") ? key.slice(0, -":exhale".length) : key)) carry.current.delete(key);
     }
+    let smokers = 0;
+    for (const src of sources.values()) if (src.kind !== "steam" && (src.active || src.exhale?.active)) smokers++;
+    const crowd = crowdFactor(smokers);
     for (const [id, src] of sources) {
       if (src.kind === "steam") {
         if (src.active) emit(id, KINDS[Kind.Steam].rate, () => spawn(Kind.Steam, src.world, 0, KINDS[Kind.Steam].rise, 0));
         continue;
       }
       if (src.active) {
-        const rate = KINDS[Kind.Tip].rate * (src.strength ?? 1);
+        const rate = KINDS[Kind.Tip].rate * (src.strength ?? 1) * crowd;
         emit(id, rate, () => spawn(Kind.Tip, src.world, (Math.random() - 0.5) * 0.01, KINDS[Kind.Tip].rise * 0.7, (Math.random() - 0.5) * 0.01));
       }
       const ex = src.exhale;
@@ -242,7 +264,7 @@ export function SmokeSystem({ sources }: { sources: Map<string, SmokeSource> }) 
         // Hardest at the start of the breath, trailing off.
         const kind = src.vape ? Kind.Vape : Kind.Exhale;
         const push = (src.vape ? 0.95 : 0.75) * (1 - ex.t) ** 1.5 + 0.08;
-        emit(`${id}:exhale`, KINDS[kind].rate * (1 - ex.t * 0.6), () => {
+        emit(`${id}:exhale`, KINDS[kind].rate * (1 - ex.t * 0.6) * crowd, () => {
           const spread = 0.12;
           spawn(
             kind,

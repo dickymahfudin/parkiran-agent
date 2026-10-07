@@ -69,7 +69,13 @@ export function CameraRig({ position, target }: { position: Vec3; target: Vec3 }
   const mode = useApp((s) => s.cameraMode);
   const compact = useApp((s) => s.compact);
   const drift = useRef(0);
-  const tmp = useRef({ focus: new THREE.Vector3(), step: new THREE.Vector3(), desired: new THREE.Vector3(), q: new THREE.Quaternion(), side: new THREE.Vector3() });
+  const tmp = useRef({
+    focus: new THREE.Vector3(),
+    step: new THREE.Vector3(),
+    desired: new THREE.Vector3(),
+    q: new THREE.Quaternion(),
+    side: new THREE.Vector3(),
+  });
   const director = useRef<DirectorState>(START);
   const directing = useRef(false);
   const zoomedFor = useRef<string | null>(null);

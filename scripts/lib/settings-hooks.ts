@@ -114,10 +114,7 @@ function hooksObject(settings: JsonObject): JsonObject | undefined {
 }
 
 /** Returns a copy without our handlers. Containers left empty are removed only if we created them. */
-export function removeOurHooks(
-  settings: JsonObject,
-  createdPaths: readonly string[] | null,
-): { settings: JsonObject; removed: number } {
+export function removeOurHooks(settings: JsonObject, createdPaths: readonly string[] | null): { settings: JsonObject; removed: number } {
   const copy = structuredClone(settings);
   let removed = 0;
   if (isOurStatusLine(copy.statusLine)) {
@@ -155,10 +152,7 @@ export function removeOurHooks(
   return { settings: copy, removed };
 }
 
-export function addOurHooks(
-  settings: JsonObject,
-  target: HookTarget,
-): { settings: JsonObject; createdPaths: string[]; statusLineSkipped: boolean } {
+export function addOurHooks(settings: JsonObject, target: HookTarget): { settings: JsonObject; createdPaths: string[]; statusLineSkipped: boolean } {
   const copy = structuredClone(settings);
   const createdPaths: string[] = [];
   let hooks = hooksObject(copy);

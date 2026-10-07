@@ -25,7 +25,14 @@ function withoutTransmission(material: THREE.Material): THREE.Material {
   if (!m.isMeshPhysicalMaterial || m.transmission <= 0) return material;
   let glass = plainGlass.get(material);
   if (!glass) {
-    glass = new THREE.MeshStandardMaterial({ color: m.color, roughness: Math.min(m.roughness, 0.1), metalness: 0, transparent: true, opacity: 0.25, depthWrite: false });
+    glass = new THREE.MeshStandardMaterial({
+      color: m.color,
+      roughness: Math.min(m.roughness, 0.1),
+      metalness: 0,
+      transparent: true,
+      opacity: 0.25,
+      depthWrite: false,
+    });
     plainGlass.set(material, glass);
   }
   return glass;

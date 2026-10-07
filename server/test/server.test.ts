@@ -40,7 +40,11 @@ const event = (over: Partial<IngestEvent> = {}): IngestEvent => ({
 });
 
 const post = (body: unknown, headers: Record<string, string> = { "x-parkiran-token": TOKEN }) =>
-  fetch(`${base}/ingest`, { method: "POST", headers: { "content-type": "application/json", ...headers }, body: typeof body === "string" ? body : JSON.stringify(body) });
+  fetch(`${base}/ingest`, {
+    method: "POST",
+    headers: { "content-type": "application/json", ...headers },
+    body: typeof body === "string" ? body : JSON.stringify(body),
+  });
 
 describe("POST /ingest", () => {
   test("accepts a valid event with the token", async () => {
@@ -68,7 +72,11 @@ describe("POST /ingest", () => {
   });
 
   test("rejects foreign Host headers (DNS rebinding)", async () => {
-    const res = await fetch(`${base}/ingest`, { method: "POST", headers: { host: "evil.example:80", "x-parkiran-token": TOKEN }, body: JSON.stringify(event()) });
+    const res = await fetch(`${base}/ingest`, {
+      method: "POST",
+      headers: { host: "evil.example:80", "x-parkiran-token": TOKEN },
+      body: JSON.stringify(event()),
+    });
     expect(res.status).toBe(403);
   });
 });

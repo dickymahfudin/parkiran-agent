@@ -163,7 +163,10 @@ class SoundEngine {
   chime(): void {
     const ctx = this.ctx;
     if (!ctx || !this.enabled || !this.bus) return;
-    for (const [freq, at] of [[880, 0], [1318.5, 0.16]] as const) {
+    for (const [freq, at] of [
+      [880, 0],
+      [1318.5, 0.16],
+    ] as const) {
       const t = ctx.currentTime + at;
       const o = ctx.createOscillator();
       o.frequency.value = freq;
@@ -182,7 +185,10 @@ class SoundEngine {
     const ctx = this.ctx;
     if (!ctx || !this.enabled || !this.bus) return;
     const t = ctx.currentTime;
-    for (const [freq, peak] of [[1760, 0.11], [3520, 0.025]] as const) {
+    for (const [freq, peak] of [
+      [1760, 0.11],
+      [3520, 0.025],
+    ] as const) {
       const o = ctx.createOscillator();
       o.frequency.value = freq;
       const g = ctx.createGain();
@@ -213,7 +219,10 @@ class SoundEngine {
       const t = ctx.currentTime + 0.02 + i * gap + Math.random() * 0.02;
       if (kind === "bakso") {
         // A small china bowl: a bright partial over a lower one, ringing out quickly.
-        for (const [freq, peak, decay] of [[2350, 0.16, 0.35], [3910, 0.06, 0.2]] as const) {
+        for (const [freq, peak, decay] of [
+          [2350, 0.16, 0.35],
+          [3910, 0.06, 0.2],
+        ] as const) {
           const o = ctx.createOscillator();
           o.frequency.value = freq * (0.99 + Math.random() * 0.02);
           const g = ctx.createGain();

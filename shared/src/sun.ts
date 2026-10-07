@@ -18,9 +18,7 @@ export function sunPosition(date: Date, lat: number, lon: number): SunPosition {
   const m = 357.52911 + jc * (35999.05029 - 0.0001537 * jc);
   const e = 0.016708634 - jc * (0.000042037 + 0.0000001267 * jc);
   const c =
-    Math.sin(rad(m)) * (1.914602 - jc * (0.004817 + 0.000014 * jc)) +
-    Math.sin(rad(2 * m)) * (0.019993 - 0.000101 * jc) +
-    Math.sin(rad(3 * m)) * 0.000289;
+    Math.sin(rad(m)) * (1.914602 - jc * (0.004817 + 0.000014 * jc)) + Math.sin(rad(2 * m)) * (0.019993 - 0.000101 * jc) + Math.sin(rad(3 * m)) * 0.000289;
   const trueLong = l0 + c;
   const omega = 125.04 - 1934.136 * jc;
   const appLong = trueLong - 0.00569 - 0.00478 * Math.sin(rad(omega));

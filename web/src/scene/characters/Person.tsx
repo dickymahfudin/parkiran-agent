@@ -1,25 +1,27 @@
 // The rigged MPFB character: one shared GLB, cloned per person, parts and colours picked from the session's look,
 // clips driven frame by frame from the brain (deterministic, so hidden-tab catch-up and the gallery work).
-import { Html, useGLTF } from "@react-three/drei";
-import { createPortal, useFrame, useLoader, useThree } from "@react-three/fiber";
+import { Html } from "@react-three/drei";
+import { createPortal, useFrame } from "@react-three/fiber";
 import { Fragment, memo, useEffect, useMemo, useRef, useState } from "react";
 import * as THREE from "three";
-import { clone as cloneSkinned } from "three/examples/jsm/utils/SkeletonUtils.js";
 import { CLIP_SEAT_Y } from "../layout.ts";
 import { sound } from "../../audio/sound.ts";
 import { Icon } from "../../hud/icons.tsx";
 import type { IconName } from "../../hud/labels.ts";
-import { getKtx2Loader } from "../art/assets.tsx";
 import { timeControl } from "../timeControl.ts";
 import type { Frame, NeedKind } from "./brain.ts";
+import { B, attach, buildRig, handFrame, useCharacterAsset } from "./characterAsset.ts";
+import { DRAGS } from "./clips.ts";
 import { disposeSkinned } from "./dispose.ts";
 import { SOLE_AHEAD, loweredAnkle, placeSandal, reachLeg, type SandalAnchor } from "./feet.ts";
 import { SANDAL_THICKNESS, Sandal } from "./Sandal.tsx";
 import type { Look } from "./identity.ts";
+import { closeFist, keepLevel, type Fist } from "./personIk.ts";
+import { CAP, Cigarette, Cup, Lighter, MAT, PHONE_GRIP, Phone, VAPE_CURL, VAPE_REACH, Vape } from "./personProps.tsx";
 import { BubbleIcon, type SmokeSource } from "./props.tsx";
 import { CrewHead } from "./Crew.tsx";
 import { characterRoots } from "./registry.ts";
-import { rigPlay, rigTime, type ClipsJson, type CupHand, type RigPlay } from "./rig.ts";
+import { rigPlay, rigTime, type CupHand, type RigPlay } from "./rig.ts";
 
 /** Anything that yields a frame per tick: a live Brain, or a frozen frame in the state gallery. */
 export interface Animator {
@@ -35,369 +37,26 @@ export interface TagInfo {
   icon: IconName | null;
 }
 
-const GLB_URL = "/assets/character/character.glb";
-const CLIPS_URL = "/assets/character/clips.json";
 const CATCH_UP_STEP_S = 0.1;
 const MAX_CATCH_UP_S = 60;
-const B = (name: string) => `mixamorig${name}`;
 /** Seconds for the laptop lid to swing fully open or shut. */
 const LID_S = 0.6;
-const ik = { hip: new THREE.Vector3(), knee: new THREE.Vector3(), ankle: new THREE.Vector3(), target: new THREE.Vector3(), fwd: new THREE.Vector3(), filter: new THREE.Vector3(), lips: new THREE.Vector3(), tip: new THREE.Vector3() };
-const level = { at: new THREE.Vector3(), axis: new THREE.Vector3(), world: new THREE.Quaternion(), parent: new THREE.Quaternion(), full: new THREE.Quaternion(), fix: new THREE.Quaternion() };
-const UP = new THREE.Vector3(0, 1, 0);
-const NO_TURN = new THREE.Quaternion();
-/** A kopi stays level in the hand, or it would spill: only this close to the lips (m) may it tip with the drinking hand. */
-const CUP_TIP = { near: 0.1, far: 0.2 };
-const LOWER = new Set(["Hips", "LeftUpLeg", "LeftLeg", "LeftFoot", "LeftToeBase", "RightUpLeg", "RightLeg", "RightFoot", "RightToeBase"].map(B));
-// Reference skin of the MPFB texture; darker looks multiply it down towards sawo matang.
-const BASE_SKIN = new THREE.Color("#e2b48c");
-
-export interface CharacterAsset {
-  scene: THREE.Group;
-  meta: ClipsJson;
-  clips: Map<string, THREE.AnimationClip>;
-  part(name: string, half: "lower" | "upper"): THREE.AnimationClip;
-}
-
-export function useCharacterAsset(): CharacterAsset {
-  const gl = useThree((s) => s.gl);
-  const gltf = useGLTF(GLB_URL, false, true, (loader) => {
-    loader.setKTX2Loader(getKtx2Loader(gl) as unknown as Parameters<typeof loader.setKTX2Loader>[0]);
-  });
-  const json = useLoader(THREE.FileLoader, CLIPS_URL) as string;
-  return useMemo(() => {
-    const meta = JSON.parse(json) as ClipsJson;
-    const clips = new Map(gltf.animations.map((c) => [c.name, c]));
-    const parts = new Map<string, THREE.AnimationClip>();
-    const part = (name: string, half: "lower" | "upper") => {
-      const key = `${name}/${half}`;
-      let c = parts.get(key);
-      if (!c) {
-        const src = clips.get(name);
-        if (!src) throw new Error(`clip ${name} missing from the character GLB`);
-        const tracks = src.tracks.filter((t) => LOWER.has(t.name.split(".")[0]!) === (half === "lower"));
-        c = new THREE.AnimationClip(key, src.duration, tracks);
-        parts.set(key, c);
-      }
-      return c;
-    };
-    for (const name of Object.keys(meta.clips)) if (!clips.has(name)) throw new Error(`clip ${name} missing from the character GLB`);
-    return { scene: gltf.scene, meta, clips, part };
-  }, [gltf, json]);
-}
-
-const PARTS = {
-  body: { shorts: "Body_Shorts", trunks: "Body_Trunks", pants: "Body_Pants" },
-  legs: { shorts: "Shorts", trunks: "Trunks", pants: "Pants" },
-  shirt: { tee: "Shirt_Tee", polo: "Shirt_Polo" },
-} as const;
-
-function tint(hex: string, gain: number): THREE.Color {
-  const c = new THREE.Color(hex).multiplyScalar(gain);
-  return c.setRGB(Math.min(1, c.r), Math.min(1, c.g), Math.min(1, c.b));
-}
-
-export interface Rig {
-  object: THREE.Group;
-  bones: Map<string, THREE.Bone>;
-  /** Bone world matrix in the bind pose (character space). */
-  bind(name: string): THREE.Matrix4;
-}
-
-export function buildRig(asset: CharacterAsset, look: Look): Rig {
-  const object = cloneSkinned(asset.scene) as THREE.Group;
-  const keep = new Set<string>([PARTS.body[look.legs], PARTS.legs[look.legs], PARTS.shirt[look.shirt], `Hair_${look.hair}`, "Eyes", "Eyebrows", "Eyelashes"]);
-  const drop: THREE.Object3D[] = [];
-  const bones = new Map<string, THREE.Bone>();
-  let skeleton: THREE.Skeleton | null = null;
-  object.traverse((o) => {
-    if ((o as THREE.Bone).isBone) bones.set(o.name, o as THREE.Bone);
-    const mesh = o as THREE.SkinnedMesh;
-    if (!mesh.isSkinnedMesh) return;
-    if (!keep.has(mesh.name)) {
-      drop.push(mesh);
-      return;
-    }
-    skeleton ??= mesh.skeleton;
-    mesh.castShadow = true;
-    mesh.receiveShadow = true;
-    // Skinned bounds come from the bind pose; seated and stretching poses leave them.
-    mesh.frustumCulled = false;
-    const mat = (mesh.material as THREE.MeshStandardMaterial).clone();
-    mat.metalness = 0;
-    if (mesh.name.startsWith("Body_")) {
-      const c = new THREE.Color(look.skin);
-      mat.color.setRGB(Math.min(1, c.r / BASE_SKIN.r), Math.min(1, c.g / BASE_SKIN.g), Math.min(1, c.b / BASE_SKIN.b));
-      mat.roughness = 0.55;
-    } else if (mesh.name.startsWith("Shirt_")) {
-      mat.color.copy(tint(look.shirtColor, 1.25));
-      mat.roughness = 0.92;
-    } else if (mesh.name === PARTS.legs[look.legs]) {
-      mat.color.copy(tint(look.legsColor, 1.25));
-      mat.roughness = 0.9;
-    } else if (mesh.name.startsWith("Hair_")) {
-      mat.color.copy(tint(look.hairColor, 4));
-    }
-    mesh.material = mat;
-  });
-  for (const o of drop) o.removeFromParent();
-  if (!skeleton) throw new Error("character GLB has no skinned body");
-  // Bones still hold the exported rest pose here (no clip applied yet). The inverse bind matrices can't be used:
-  // mesh quantisation folds the vertex dequantisation into them.
-  object.updateMatrixWorld(true);
-  const rest = new Map([...bones].map(([n, b]) => [n, b.matrixWorld.clone()]));
-  const bind = (name: string) => {
-    const m = rest.get(B(name));
-    if (!m) throw new Error(`bone ${name} missing`);
-    return m.clone();
-  };
-  return { object, bones, bind };
-}
-
-/** Adds `prop` under `bone` so that, in the bind pose, it sits at `pos` with its +Z along `axis` (character space). */
-export function attach(rig: Rig, bone: string, prop: THREE.Object3D, pos: THREE.Vector3, axis: THREE.Vector3, up?: THREE.Vector3): void {
-  const q = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 0, 1), axis.clone().normalize());
-  if (up) {
-    // Roll around the axis so the prop's +Y points as close to `up` as possible.
-    const curUp = new THREE.Vector3(0, 1, 0).applyQuaternion(q);
-    const wanted = up.clone().sub(axis.clone().multiplyScalar(up.dot(axis))).normalize();
-    const roll = new THREE.Quaternion().setFromUnitVectors(curUp, wanted);
-    q.premultiply(roll);
-  }
-  const world = new THREE.Matrix4().compose(pos, q, new THREE.Vector3(1, 1, 1));
-  const local = rig.bind(bone).invert().multiply(world);
-  local.decompose(prop.position, prop.quaternion, prop.scale);
-  const target = rig.bones.get(B(bone));
-  if (!target) throw new Error(`bone ${bone} missing`);
-  target.add(prop);
-}
-
-function handFrame(rig: Rig, side: "Left" | "Right") {
-  const p = (n: string) => new THREE.Vector3().setFromMatrixPosition(rig.bind(`${side}${n}`));
-  const hand = p("Hand");
-  const fingers = p("HandMiddle1").sub(hand).normalize();
-  const across = p("HandIndex1").sub(p("HandPinky1")).normalize();
-  const palm = new THREE.Vector3().crossVectors(fingers, across).normalize();
-  // Palms face the body in the bind (A) pose.
-  if (palm.x * (side === "Left" ? -1 : 1) < 0) palm.negate();
-  return { hand, fingers, across, palm, at: p };
-}
-
-const fistTmp = {
-  hand: new THREE.Vector3(),
-  index: new THREE.Vector3(),
-  middle: new THREE.Vector3(),
-  pinky: new THREE.Vector3(),
-  fingers: new THREE.Vector3(),
-  across: new THREE.Vector3(),
-  palm: new THREE.Vector3(),
-  axis: new THREE.Vector3(),
-  parent: new THREE.Quaternion(),
-  world: new THREE.Quaternion(),
-  turn: new THREE.Quaternion(),
+const ik = {
+  hip: new THREE.Vector3(),
+  knee: new THREE.Vector3(),
+  ankle: new THREE.Vector3(),
+  target: new THREE.Vector3(),
+  fwd: new THREE.Vector3(),
+  filter: new THREE.Vector3(),
+  lips: new THREE.Vector3(),
+  tip: new THREE.Vector3(),
 };
-
-/**
- * Curls the right hand's fingers towards the palm (about the hand's current knuckle axis), on top of the clip pose,
- * which is saved first so the next frame can put it back. World matrices must be current.
- */
-function closeFist(fist: { hand: THREE.Bone; index1: THREE.Bone; middle1: THREE.Bone; pinky1: THREE.Bone; palmSign: number; curl: readonly (readonly [THREE.Bone, number])[] }, saved: THREE.Quaternion[]): void {
-  const t = fistTmp;
-  fist.hand.getWorldPosition(t.hand);
-  t.fingers.subVectors(fist.middle1.getWorldPosition(t.middle), t.hand).normalize();
-  t.across.subVectors(fist.index1.getWorldPosition(t.index), fist.pinky1.getWorldPosition(t.pinky)).normalize();
-  t.palm.crossVectors(t.fingers, t.across).normalize().multiplyScalar(fist.palmSign);
-  // Turning `fingers` about fingers × palm moves it towards the palm.
-  t.axis.crossVectors(t.fingers, t.palm).normalize();
-  fist.curl.forEach(([bone, angle], i) => {
-    saved[i]!.copy(bone.quaternion);
-    bone.parent!.getWorldQuaternion(t.parent);
-    bone.getWorldQuaternion(t.world);
-    t.world.premultiply(t.turn.setFromAxisAngle(t.axis, angle));
-    bone.quaternion.copy(t.parent.invert().multiply(t.world));
-    bone.updateMatrixWorld(true);
-  });
-}
 
 const SMOOTH = (k: number) => k * k * (3 - 2 * k);
 /** Name tag height over the head bone (at the base of the skull): just clear of the hair, seated or standing. */
 const TAG_ABOVE_HEAD = 0.34;
 /** How fast the tag follows the head (1/s): steady through breathing and typing, quick to follow a sit-down. */
 const TAG_FOLLOW = 5;
-
-/**
- * Rig clips with a drag on the cigarette, in clip seconds (make_animations.py): while the hand is at the lips the tip
- * glows and gives off little smoke; once it leaves, the smoke comes back out of the mouth.
- */
-const DRAGS: Record<string, { drag: readonly [number, number]; exhale: readonly [number, number] }> = {
-  smoke: { drag: [1.75, 2.9], exhale: [2.95, 4.4] },
-  smokeStand: { drag: [2.45, 3.6], exhale: [3.65, 5.1] },
-  think: { drag: [1.95, 2.6], exhale: [2.65, 4.0] },
-  drag: { drag: [0.05, 0.6], exhale: [0.65, 1.5] },
-  phone: { drag: [4.55, 5.6], exhale: [5.7, 7.1] },
-  cupSmoke: { drag: [1.75, 2.9], exhale: [2.95, 4.4] },
-};
-/** Cap crown: an ellipsoid hugging the cropped hair (head ±0.075 wide, 0.2 deep, crown at 1.66 m). */
-/** Cap anchor (skull centre) and crown radii: the crown sits high enough to clear the ears and still covers the hair. */
-const CAP = { y: 1.588, z: 0.042, crown: [0.09, 0.078, 0.104] as [number, number, number], lift: 0.014 };
-
-const MAT = {
-  paper: new THREE.MeshStandardMaterial({ color: "#f2efe6", roughness: 0.8 }),
-  filter: new THREE.MeshStandardMaterial({ color: "#c98a3c", roughness: 0.7 }),
-  lighter: new THREE.MeshStandardMaterial({ color: "#d23c2a", roughness: 0.4 }),
-  flame: new THREE.MeshStandardMaterial({ color: "#ffd27a", emissive: "#ff9a2a", emissiveIntensity: 4, transparent: true, opacity: 0.9 }),
-  cup: new THREE.MeshStandardMaterial({ color: "#efe9dd", roughness: 0.35 }),
-  coffee: new THREE.MeshStandardMaterial({ color: "#3b2416", roughness: 0.2 }),
-  laptop: new THREE.MeshStandardMaterial({ color: "#2a2d33", metalness: 0.5, roughness: 0.45 }),
-  vape: new THREE.MeshStandardMaterial({ color: "#3a4352", metalness: 0.6, roughness: 0.35 }),
-  vapeTip: new THREE.MeshStandardMaterial({ color: "#14161a", roughness: 0.5 }),
-  screen: new THREE.MeshStandardMaterial({ color: "#0d1b2a", emissive: "#5ab4ff", emissiveIntensity: 0.55 }),
-};
-
-function Cigarette({ tip, tipMat }: { tip: React.RefObject<THREE.Mesh | null>; tipMat: THREE.Material }) {
-  return (
-    <group>
-      <mesh position={[0, 0, 0.012]} rotation={[Math.PI / 2, 0, 0]} material={MAT.filter}>
-        <cylinderGeometry args={[0.0045, 0.0045, 0.024, 6]} />
-      </mesh>
-      <mesh position={[0, 0, 0.052]} rotation={[Math.PI / 2, 0, 0]} material={MAT.paper}>
-        <cylinderGeometry args={[0.0045, 0.0045, 0.056, 6]} />
-      </mesh>
-      <mesh ref={tip} position={[0, 0, 0.082]} rotation={[Math.PI / 2, 0, 0]} material={tipMat}>
-        <cylinderGeometry args={[0.005, 0.005, 0.006, 6]} />
-      </mesh>
-    </group>
-  );
-}
-
-/**
- * A pod vape held upright in the fist, not between two fingers like a cigarette: the mouthpiece tip at the anchor (+Y
- * towards the index finger, the end the drags bring to the lips), the body down the inside of the curled fingers, an
- * LED near the bottom that lights up while it is drawn on.
- */
-function Vape({ led }: { led: THREE.Material }) {
-  return (
-    <group>
-      <mesh position={[0, -0.006, 0]} material={MAT.vapeTip}>
-        <boxGeometry args={[0.012, 0.012, 0.008]} />
-      </mesh>
-      <mesh position={[0, -0.044, 0]} material={MAT.vape}>
-        <boxGeometry args={[0.021, 0.064, 0.011]} />
-      </mesh>
-      <mesh position={[0, -0.066, 0.0057]} material={led}>
-        <planeGeometry args={[0.006, 0.006]} />
-      </mesh>
-    </group>
-  );
-}
-
-/** Extra bend per finger joint (rad, base to tip) closing the cigarette hand into a fist round a pod vape. */
-const VAPE_CURL: [string, readonly [number, number, number]][] = [
-  ["Index", [0.7, 0.9, 0.5]],
-  ["Middle", [0.7, 0.9, 0.5]],
-  ["Ring", [0.5, 0.7, 0.4]],
-  ["Pinky", [0.4, 0.6, 0.4]],
-];
-/** The fist's arm follows the cigarette's drags; within this distance of the lips it is pulled so the pod's tip, not the cigarette's filter, meets them. */
-const VAPE_REACH = { near: 0.03, far: 0.14 };
-
-function Lighter({ flame }: { flame: React.RefObject<THREE.Mesh | null> }) {
-  return (
-    <>
-      <mesh material={MAT.lighter}>
-        <boxGeometry args={[0.012, 0.055, 0.022]} />
-      </mesh>
-      <mesh ref={flame} position={[0, 0.045, 0]} material={MAT.flame}>
-        <coneGeometry args={[0.008, 0.028, 8]} />
-      </mesh>
-    </>
-  );
-}
-
-
-/** A scrolled feed: header, posts, a picture block (it lights the face a little at night). */
-function phoneScreenTexture(): THREE.CanvasTexture {
-  const c = document.createElement("canvas");
-  c.width = 72;
-  c.height = 150;
-  const ctx = c.getContext("2d");
-  if (!ctx) throw new Error("2D canvas unavailable");
-  ctx.fillStyle = "#f4f5f7";
-  ctx.fillRect(0, 0, 72, 150);
-  ctx.fillStyle = "#1f8a5a";
-  ctx.fillRect(0, 0, 72, 16);
-  for (let i = 0; i < 4; i++) {
-    const y = 22 + i * 32;
-    ctx.fillStyle = "#c9ccd2";
-    ctx.beginPath();
-    ctx.arc(10, y + 6, 5, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.fillRect(19, y + 2, 40, 4);
-    ctx.fillRect(19, y + 9, 28, 3);
-    ctx.fillStyle = i === 1 ? "#e3a66a" : "#dfe2e7";
-    ctx.fillRect(4, y + 15, 64, i === 1 ? 14 : 6);
-  }
-  const t = new THREE.CanvasTexture(c);
-  t.colorSpace = THREE.SRGBColorSpace;
-  return t;
-}
-
-const SCREEN = phoneScreenTexture();
-const PHONE_SCREEN = new THREE.MeshStandardMaterial({ map: SCREEN, emissiveMap: SCREEN, emissive: "#ffffff", emissiveIntensity: 0.9, roughness: 0.25 });
-/** Phone cases, picked per person: light and bright ones read against a dark shirt from across the lot. */
-const PHONE_CASES = ["#d9d4c7", "#3f6fb0", "#c0463a", "#e7b9c0", "#8fa67a", "#1b1d22", "#e0b043"].map(
-  (color) => new THREE.MeshStandardMaterial({ color, roughness: 0.5 }),
-);
-
-/** Phone centre from the wrist (m): along the fingers, out of the palm, and up the knuckle line towards the index. */
-const PHONE_GRIP = { along: 0.089, out: 0.024, up: 0.06 } as const;
-
-/** Phone prop (a big one, 7.6 × 16 cm): +Z out of the screen, +Y along the long side. */
-function Phone({ seed }: { seed: number }) {
-  return (
-    <>
-      <mesh material={PHONE_CASES[seed % PHONE_CASES.length]} castShadow>
-        <boxGeometry args={[0.076, 0.16, 0.01]} />
-      </mesh>
-      <mesh position={[0, 0, 0.0051]} material={PHONE_SCREEN}>
-        <planeGeometry args={[0.07, 0.152]} />
-      </mesh>
-    </>
-  );
-}
-
-/** A glass of kopi: +Z up out of its mouth, centred where the hand grips it. */
-function Cup() {
-  return (
-    <>
-      <mesh rotation={[Math.PI / 2, 0, 0]} material={MAT.cup}>
-        <cylinderGeometry args={[0.034, 0.028, 0.08, 14]} />
-      </mesh>
-      <mesh position={[0, 0, 0.034]} rotation={[Math.PI / 2, 0, 0]} material={MAT.coffee}>
-        <cylinderGeometry args={[0.031, 0.031, 0.006, 14]} />
-      </mesh>
-    </>
-  );
-}
-
-/**
- * Turns a hand-held cup (its local rotation reset to `grip` first) so it stands upright in the world, easing into the
- * hand's own tilt as it nears the lips (the sip clips tip it to drink). World matrices must be current.
- */
-function keepLevel(cup: THREE.Object3D, grip: THREE.Quaternion, lips: THREE.Vector3): void {
-  cup.quaternion.copy(grip);
-  cup.updateWorldMatrix(true, false);
-  cup.getWorldPosition(level.at);
-  const upright = THREE.MathUtils.smoothstep(level.at.distanceTo(lips), CUP_TIP.near, CUP_TIP.far);
-  if (upright <= 0) return;
-  cup.getWorldQuaternion(level.world);
-  level.axis.set(0, 0, 1).applyQuaternion(level.world);
-  level.full.setFromUnitVectors(level.axis, UP);
-  level.fix.slerpQuaternions(NO_TURN, level.full, upright);
-  cup.parent!.getWorldQuaternion(level.parent);
-  cup.quaternion.copy(level.parent.invert().multiply(level.world.premultiply(level.fix)));
-  cup.updateWorldMatrix(false, false);
-}
 
 interface Props {
   brain: Animator;
@@ -417,7 +76,14 @@ const sameTag = (a: TagInfo | null, b: TagInfo | null): boolean =>
 /** Session updates re-render the character list many times a second; a person only re-renders when its tag changes. */
 export const Person = memo(
   PersonView,
-  (a, b) => a.brain === b.brain && a.look === b.look && a.friend === b.friend && a.smoke === b.smoke && a.steam === b.steam && a.trackId === b.trackId && sameTag(a.tag, b.tag),
+  (a, b) =>
+    a.brain === b.brain &&
+    a.look === b.look &&
+    a.friend === b.friend &&
+    a.smoke === b.smoke &&
+    a.steam === b.steam &&
+    a.trackId === b.trackId &&
+    sameTag(a.tag, b.tag),
 );
 
 function PersonView({ brain, look, tag, friend, smoke, steam, onSelect, trackId }: Props) {
@@ -473,7 +139,10 @@ function PersonView({ brain, look, tag, friend, smoke, steam, onSelect, trackId 
     // the right (the left carries the laptop).
     // The knuckle line slants back towards the pinky; square to the fingers instead, so the phone stands upright when
     // the clip holds the fingers level.
-    for (const [f, bone, phone] of [[l, "LeftHand", phoneL], [r, "RightHand", phoneR]] as const) {
+    for (const [f, bone, phone] of [
+      [l, "LeftHand", phoneL],
+      [r, "RightHand", phoneR],
+    ] as const) {
       const upright = new THREE.Vector3().crossVectors(f.palm, f.fingers).normalize();
       if (upright.dot(f.across) < 0) upright.negate();
       const at = f.hand.clone().addScaledVector(f.fingers, PHONE_GRIP.along).addScaledVector(f.palm, PHONE_GRIP.out).addScaledVector(upright, PHONE_GRIP.up);
@@ -481,11 +150,17 @@ function PersonView({ brain, look, tag, friend, smoke, steam, onSelect, trackId 
     }
     // The kopi goes in the left hand, the right one being the smoking hand; only beside the phone (seated, left hand)
     // is it in the right. Upright along the knuckle line (thumb up), in front of the palm.
-    for (const [f, bone, cup] of [[l, "LeftHand", cupL], [r, "RightHand", cupR]] as const) {
+    for (const [f, bone, cup] of [
+      [l, "LeftHand", cupL],
+      [r, "RightHand", cupR],
+    ] as const) {
       attach(rig, bone, cup, f.hand.clone().addScaledVector(f.fingers, 0.06).addScaledVector(f.palm, 0.05), f.across);
     }
     // The laptop is carried in the left hand, or in the right while the left one has the kopi.
-    for (const [f, bone, laptop] of [[l, "LeftHand", carry], [r, "RightHand", carryR]] as const) {
+    for (const [f, bone, laptop] of [
+      [l, "LeftHand", carry],
+      [r, "RightHand", carryR],
+    ] as const) {
       attach(rig, bone, laptop, f.hand.clone().addScaledVector(f.fingers, 0.13).addScaledVector(f.palm, 0.02), f.across, f.palm);
     }
     const bone = (name: string) => {
@@ -499,7 +174,10 @@ function PersonView({ brain, look, tag, friend, smoke, steam, onSelect, trackId 
       const toe = new THREE.Vector3().setFromMatrixPosition(rig.bind(`${side}ToeBase`));
       const fwd = toe.clone().sub(ankle).setY(0).normalize();
       // In the air the sole hangs right under the foot (the bind pose stands on y = 0).
-      const center = ankle.clone().addScaledVector(fwd, SOLE_AHEAD).setY(-SANDAL_THICKNESS / 2);
+      const center = ankle
+        .clone()
+        .addScaledVector(fwd, SOLE_AHEAD)
+        .setY(-SANDAL_THICKNESS / 2);
       attach(rig, `${side}Foot`, sole, center, fwd);
       const anchor: SandalAnchor = { position: sole.position.clone(), quaternion: sole.quaternion.clone(), scale: sole.scale.clone() };
       const chain = [bone(`${side}UpLeg`), bone(`${side}Leg`), bone(`${side}Foot`)] as const;
@@ -518,7 +196,7 @@ function PersonView({ brain, look, tag, friend, smoke, steam, onSelect, trackId 
     const fistCentre = r.at("HandIndex1").add(r.at("HandPinky1")).multiplyScalar(0.5).addScaledVector(r.fingers, -0.015).addScaledVector(r.palm, 0.03);
     attach(rig, "RightHand", vapeGrip, fistCentre.addScaledVector(r.across, 0.044), r.palm, r.across);
     const palmSign = Math.sign(new THREE.Vector3().crossVectors(r.fingers, r.across).dot(r.palm)) || 1;
-    const fist = {
+    const fist: Fist = {
       arm: bone("RightArm"),
       foreArm: bone("RightForeArm"),
       hand: bone("RightHand"),
@@ -529,7 +207,26 @@ function PersonView({ brain, look, tag, friend, smoke, steam, onSelect, trackId 
       curl: VAPE_CURL.flatMap(([finger, angles]) => angles.map((a, i) => [bone(`RightHand${finger}${i + 1}`), a] as const)),
     };
     const grip = { left: cupL.quaternion.clone(), right: cupR.quaternion.clone() };
-    return { handCig, mouthCig, lighter, lighterR, phoneL, phoneR, cupL, cupR, grip, carry, carryR, feet, cap, crewHead, vapeGrip, fist, head: bone("Head"), neck: bone("Neck") };
+    return {
+      handCig,
+      mouthCig,
+      lighter,
+      lighterR,
+      phoneL,
+      phoneR,
+      cupL,
+      cupR,
+      grip,
+      carry,
+      carryR,
+      feet,
+      cap,
+      crewHead,
+      vapeGrip,
+      fist,
+      head: bone("Head"),
+      neck: bone("Neck"),
+    };
   }, [rig, asset.meta.mouth, look.cap, look.accessory]);
 
   const actions = useRef(new Map<string, THREE.AnimationAction>());
@@ -764,7 +461,15 @@ function PersonView({ brain, look, tag, friend, smoke, steam, onSelect, trackId 
 
   const sit = asset.meta.sitHips;
   return (
-    <group ref={root} scale={look.scale * (friend ? 0.97 : 1)} onClick={(e) => (e.stopPropagation(), onSelect?.())}>
+    // biome-ignore lint/a11y/noStaticElementInteractions: a three.js group, not a DOM element; the HUD row is the keyboard path
+    <group
+      ref={root}
+      scale={look.scale * (friend ? 0.97 : 1)}
+      onClick={(e) => {
+        e.stopPropagation();
+        onSelect?.();
+      }}
+    >
       <primitive object={rig.object} />
       {/* Props live inside the skeleton (bone children); portals render into them without reparenting. */}
       {!vape && createPortal(<Cigarette tip={tipHand} tipMat={tipMat} />, props.handCig)}

@@ -72,7 +72,13 @@ function SessionRow({ s, now, selected, onSelect }: { s: PublicSession; now: num
   const friends = Object.keys(s.subagents).length;
   const tool = s.currentTool ?? s.lastTool;
   return (
-    <button type="button" className={`session-row mood-${label.mood}${selected ? " selected" : ""}`} onClick={onSelect} aria-pressed={selected} data-session={s.id}>
+    <button
+      type="button"
+      className={`session-row mood-${label.mood}${selected ? " selected" : ""}`}
+      onClick={onSelect}
+      aria-pressed={selected}
+      data-session={s.id}
+    >
       <Avatar s={s} />
       <span className="session-main">
         <span className="project">{sessionName(s, twins)}</span>
@@ -97,6 +103,7 @@ function SessionRow({ s, now, selected, onSelect }: { s: PublicSession; now: num
 /** Counts per state; each chip also filters the list to that state (click again for all). */
 function Summary({ list, now, filter, onFilter }: { list: PublicSession[]; now: number; filter: Mood | null; onFilter(mood: Mood | null): void }) {
   return (
+    // biome-ignore lint/a11y/useSemanticElements: a <fieldset> would bring its own box and legend styling
     <div className="summary" role="group" aria-label="Sessions by state (click to filter)">
       {moodCounts(list, now).map(({ mood, count }) => (
         <button
@@ -273,7 +280,9 @@ function Attention({ list, now }: { list: PublicSession[]; now: number }) {
               <b>{s.project ? sessionName(s, twins) : "Claude Code"}</b> {NEED_PHRASE[need.kind]}
               {need.toolName && need.kind === "permission" && <span className="attention-tool"> · {formatToolName(need.toolName)}</span>}
             </span>
-            <span className="attention-age" aria-hidden="true">{formatAge(now - need.since)}</span>
+            <span className="attention-age" aria-hidden="true">
+              {formatAge(now - need.since)}
+            </span>
           </button>
         );
       })}
@@ -289,12 +298,13 @@ function NeedAnnouncer({ list }: { list: PublicSession[] }) {
   const key = latest ? `${latest.id}:${latest.need!.since}` : "";
   const [said, setSaid] = useState({ key: "", text: "" });
   useEffect(() => {
-    if (key && key !== said.key && latest) setSaid({ key, text: `${latest.project ? sessionName(latest, twins) : "Claude Code"} ${NEED_PHRASE[latest.need!.kind]}` });
+    if (key && key !== said.key && latest)
+      setSaid({ key, text: `${latest.project ? sessionName(latest, twins) : "Claude Code"} ${NEED_PHRASE[latest.need!.kind]}` });
   }, [key, said.key, latest, twins]);
   return (
-    <div className="sr-only" role="status" aria-live="polite">
+    <output className="sr-only" aria-live="polite">
       {said.text}
-    </div>
+    </output>
   );
 }
 
@@ -340,11 +350,13 @@ function TimeControl({ override }: { override: string | null }) {
     const items = [...(menu.current?.querySelectorAll<HTMLElement>('[role="menuitemradio"]') ?? [])];
     if (items.length === 0) return;
     const at = items.indexOf(document.activeElement as HTMLElement);
-    const to = e.key === "ArrowDown" ? (at + 1) % items.length : e.key === "ArrowUp" ? (at - 1 + items.length) % items.length : e.key === "Home" ? 0 : items.length - 1;
+    const to =
+      e.key === "ArrowDown" ? (at + 1) % items.length : e.key === "ArrowUp" ? (at - 1 + items.length) % items.length : e.key === "Home" ? 0 : items.length - 1;
     e.preventDefault();
     items[to]?.focus();
   };
   return (
+    // biome-ignore lint/a11y/noStaticElementInteractions: the handlers only delegate keyboard navigation to the menu buttons inside
     <div
       className="time-control"
       ref={root}
@@ -404,7 +416,12 @@ function Toolbar() {
           <button type="button" aria-pressed={cameraMode === "orbit"} onClick={() => set.setCameraMode("orbit")} title="Drag to orbit, scroll to zoom">
             Orbit
           </button>
-          <button type="button" aria-pressed={cameraMode === "cinematic"} onClick={() => set.setCameraMode("cinematic")} title="Director: the camera goes where things happen">
+          <button
+            type="button"
+            aria-pressed={cameraMode === "cinematic"}
+            onClick={() => set.setCameraMode("cinematic")}
+            title="Director: the camera goes where things happen"
+          >
             Cinematic
           </button>
         </div>
@@ -520,7 +537,9 @@ function EventFeed({ now }: { now: number }) {
               <span className="cue-text">
                 <b>{sessions[e.cue.sessionId] ? sessionName(sessions[e.cue.sessionId]!, twins) : shortId(e.cue.sessionId)}</b> <CueText line={line} />
               </span>
-              <span className="age" aria-hidden="true">{formatAge(now - e.at)}</span>
+              <span className="age" aria-hidden="true">
+                {formatAge(now - e.at)}
+              </span>
             </li>
           ))}
         </ol>

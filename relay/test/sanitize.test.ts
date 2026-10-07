@@ -8,15 +8,7 @@ const TS = 1_760_000_000_000;
 const resolver: RepoResolver = () => ({ project: "my-project", branch: "feature/korek" });
 
 // Raw keys whose (validated) values may be forwarded. Everything else must never appear in the output.
-const FORWARDABLE_RAW_KEYS = new Set([
-  "hook_event_name",
-  "session_id",
-  "tool_name",
-  "notification_type",
-  "agent_id",
-  "agent_type",
-  "tool_use_id",
-]);
+const FORWARDABLE_RAW_KEYS = new Set(["hook_event_name", "session_id", "tool_name", "notification_type", "agent_id", "agent_type", "tool_use_id"]);
 const FORWARDABLE_BY_EVENT: Record<string, string[]> = {
   SessionStart: ["source"],
   SessionEnd: ["reason"],
@@ -69,11 +61,7 @@ describe("buildIngestEvent", () => {
   });
 
   test("unknown future fields are dropped", () => {
-    const event = buildIngestEvent(
-      { ...PAYLOADS.Stop, brand_new_field: SECRET, tool_input: SECRET, tool_response: SECRET, prompt: SECRET },
-      TS,
-      resolver,
-    );
+    const event = buildIngestEvent({ ...PAYLOADS.Stop, brand_new_field: SECRET, tool_input: SECRET, tool_response: SECRET, prompt: SECRET }, TS, resolver);
     expect(JSON.stringify(event)).not.toContain(SECRET);
   });
 

@@ -99,7 +99,10 @@ const fragmentShader = /* glsl */ `
 `;
 
 export function Sky() {
-  const textures = useLoader(HDRLoader, BANDS.map((b) => HDRI[b])) as THREE.DataTexture[];
+  const textures = useLoader(
+    HDRLoader,
+    BANDS.map((b) => HDRI[b]),
+  ) as THREE.DataTexture[];
   const gl = useThree((s) => s.gl);
   const scene = useThree((s) => s.scene);
   const byBand = useMemo(() => {
