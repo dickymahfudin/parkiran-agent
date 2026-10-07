@@ -23,6 +23,8 @@ import {
   sessionName,
   shortId,
   stateLabel,
+  unseenAttention,
+  ATTENTION_MOODS,
   type Mood,
 } from "./labels.ts";
 
@@ -494,30 +496,60 @@ function CueText({ line }: { line: CueLine }) {
 }
 
 type FeedFilter = "all" | "attention";
-const ATTENTION_MOODS = new Set(["needs", "trouble"]);
 
+/**
+ * The event feed. Folds to its header (remembered per browser) like the session list; while folded, the header counts
+ * the "needs you" events that arrived since, and the count clears when the feed is opened. It never opens by itself:
+ * the attention banner already covers what needs you.
+ */
 function EventFeed({ now }: { now: number }) {
   const cueLog = useApp((st) => st.cueLog);
   const sessions = useApp((st) => st.sessions);
   const twins = useApp((st) => st.twins);
+  const collapsed = useApp((st) => st.eventsCollapsed);
   const [filter, setFilter] = useState<FeedFilter>("all");
-  const lines = cueLog
-    .map((e) => ({ e, line: cueLine(e.cue, sessions[e.cue.sessionId]) }))
-    .filter(({ line }) => filter === "all" || ATTENTION_MOODS.has(line.mood));
+  // The newest event when the feed was folded (or the page loaded folded): only later ones count.
+  const [seenSeq, setSeenSeq] = useState(() => useApp.getState().cueSeq);
+  const unseen = collapsed ? unseenAttention(cueLog, seenSeq, sessions) : 0;
+  const fold = (on: boolean) => {
+    setSeenSeq(useApp.getState().cueSeq);
+    useApp.getState().setEventsCollapsed(on);
+  };
+  const lines = collapsed
+    ? []
+    : cueLog.map((e) => ({ e, line: cueLine(e.cue, sessions[e.cue.sessionId]) })).filter(({ line }) => filter === "all" || ATTENTION_MOODS.has(line.mood));
   return (
-    <section className="panel cue-panel" aria-label="Events">
+    <section className={`panel cue-panel${collapsed ? " collapsed" : ""}`} aria-label="Events">
       <header>
         <h2>Events</h2>
-        <div className="segmented small">
-          <button type="button" aria-pressed={filter === "all"} onClick={() => setFilter("all")}>
-            All
-          </button>
-          <button type="button" aria-pressed={filter === "attention"} onClick={() => setFilter("attention")}>
-            Needs you
-          </button>
-        </div>
+        {collapsed ? (
+          unseen > 0 && (
+            <span className="feed-unseen" title="Events that need you since the feed was folded">
+              {unseen} {unseen === 1 ? "needs you" : "need you"}
+            </span>
+          )
+        ) : (
+          <div className="segmented small">
+            <button type="button" aria-pressed={filter === "all"} onClick={() => setFilter("all")}>
+              All
+            </button>
+            <button type="button" aria-pressed={filter === "attention"} onClick={() => setFilter("attention")}>
+              Needs you
+            </button>
+          </div>
+        )}
+        <button
+          type="button"
+          className="icon-button fold"
+          aria-expanded={!collapsed}
+          aria-label={collapsed ? "Show the events" : "Fold the events"}
+          title={collapsed ? "Show the events" : "Fold the events (the header keeps counting what needs you)"}
+          onClick={() => fold(!collapsed)}
+        >
+          <Icon name={collapsed ? "collapse" : "expandList"} />
+        </button>
       </header>
-      {lines.length === 0 ? (
+      {collapsed ? null : lines.length === 0 ? (
         <p className="feed-empty">
           {filter === "all" ? (
             "Events show up here as sessions work."

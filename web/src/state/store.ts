@@ -82,6 +82,8 @@ interface AppState {
   notificationsEnabled: boolean;
   /** The session list folded down to its header and summary (remembered in this browser). */
   sessionsCollapsed: boolean;
+  /** The event feed folded to its header (per browser). */
+  eventsCollapsed: boolean;
   /** Needs the user has seen (clicked the character): session id → need.since. Stops the repeating sound only. */
   acknowledged: Record<string, number>;
   setConnection(status: ConnectionStatus, error?: string | null): void;
@@ -99,6 +101,7 @@ interface AppState {
   unlockAudio(): void;
   setNotificationsEnabled(on: boolean): void;
   setSessionsCollapsed(on: boolean): void;
+  setEventsCollapsed(on: boolean): void;
   acknowledge(sessionId: string): void;
 }
 
@@ -125,6 +128,7 @@ export const useApp = create<AppState>((set) => ({
   // anywhere on the page (which browsers treat as unprompted and may block for good).
   notificationsEnabled: pref("notifications", false),
   sessionsCollapsed: pref("sessionsCollapsed", false),
+  eventsCollapsed: pref("eventsCollapsed", false),
   acknowledged: {},
 
   setTimeOverride: (timeOverride) => set({ timeOverride }),
@@ -190,6 +194,10 @@ export const useApp = create<AppState>((set) => ({
   setSessionsCollapsed: (sessionsCollapsed) => {
     savePref("sessionsCollapsed", sessionsCollapsed);
     set({ sessionsCollapsed });
+  },
+  setEventsCollapsed: (eventsCollapsed) => {
+    savePref("eventsCollapsed", eventsCollapsed);
+    set({ eventsCollapsed });
   },
   acknowledge: (sessionId) =>
     set((st) => {

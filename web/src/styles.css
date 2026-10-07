@@ -757,8 +757,33 @@ h2 {
 .cue-panel header {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  gap: 8px;
   padding: 0 6px 8px 0;
+}
+.cue-panel header h2 {
+  flex: 1;
+}
+.cue-panel .fold {
+  padding: 4px;
+  font-size: 15px;
+}
+/* Folded: the header alone, bottom right, with the count of what needs you since. */
+.cue-panel.collapsed {
+  width: auto;
+  min-width: 150px;
+  padding-bottom: 8px;
+}
+.cue-panel.collapsed header {
+  padding-bottom: 0;
+}
+.feed-unseen {
+  font-size: 10.5px;
+  font-weight: 700;
+  color: #101318;
+  background: #ff8a3d;
+  padding: 3px 8px;
+  border-radius: 999px;
+  white-space: nowrap;
 }
 .cue-panel ol {
   list-style: none;

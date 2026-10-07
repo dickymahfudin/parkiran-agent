@@ -137,7 +137,8 @@ sessions on each one takes a single line, the panel stops at 58 % of the window 
 the list by state, and the fold button tucks it away down to the summary (remembered per browser). Click a row or a character for details (state,
 tool, calls, how often it asked you and how long it waited for you, its last hour as a strip, and its tool mix); the camera
 follows it, `Esc` lets go). Sessions waiting on you also appear as a banner at the top until they are handled; the event
-feed has an "All / Needs you" filter and marks milestones (100 tool calls, 1 h of work, the 2nd compaction). The toolbar has free / cinematic camera, reset view, compact mode for a second
+feed has an "All / Needs you" filter, marks milestones (100 tool calls, 1 h of work, the 2nd compaction), and folds to
+its header (remembered per browser); folded, the header counts the events that needed you since. The toolbar has free / cinematic camera, reset view, compact mode for a second
 monitor, sound, notifications and the time of day (plus a free time input in dev mode). A loading screen covers the lot until
 every part of the scene has arrived. States and events use stroke icons (Lucide), no emoji. Plain facts read in English; the warung jokes stay ("cari korek", "batal
 ngerokok", "bawa kopi").

@@ -22,3 +22,8 @@ export function shouldChime(s: PublicSession, acknowledgedSince: number | undefi
   if (!s.need || acknowledgedSince === s.need.since) return false;
   return lastChime === undefined || lastChime < s.need.since || now - lastChime >= CHIME_EVERY_MS;
 }
+
+/** Pure rate limit, unit tested: may a system notification be shown now, given when the last one for the session was? */
+export function shouldNotify(lastNotified: number | undefined, now: number): boolean {
+  return lastNotified === undefined || now - lastNotified >= NOTIFY_EVERY_MS;
+}

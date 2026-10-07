@@ -2,7 +2,7 @@
 // web/public on `bun install` (postinstall). Usage: bun scripts/assets/archive.ts pack|unpack
 import { copyFileSync, existsSync, mkdirSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { join, relative, resolve } from "node:path";
-import { badEntries, parseTarListing, sha256Bytes, verifyFiles } from "./verify.ts";
+import { badEntries, isAppleDouble, listTarGz, sha256Bytes, verifyFiles } from "./verify.ts";
 
 const ROOT = resolve(import.meta.dir, "..", "..");
 const PUBLIC = join(ROOT, "web", "public");
@@ -27,13 +27,13 @@ function walk(dir: string): string[] {
   });
 }
 
-function run(cmd: string[]): string {
-  const r = Bun.spawnSync(cmd, { cwd: ROOT, stdout: "pipe", stderr: "pipe" });
+function run(cmd: string[], env: Record<string, string> = {}): string {
+  const r = Bun.spawnSync(cmd, { cwd: ROOT, stdout: "pipe", stderr: "pipe", env: { ...process.env, ...env } });
   if (r.exitCode !== 0) throw new Error(`${cmd.join(" ")} failed: ${r.stderr.toString().trim()}`);
   return r.stdout.toString();
 }
 
-function pack(): void {
+function pack(force: boolean): void {
   if (!existsSync(ASSETS)) throw new Error("web/public/assets is missing; run `bun run assets` first");
   const files = Object.fromEntries(
     walk(ASSETS)
@@ -41,13 +41,17 @@ function pack(): void {
       .map((p) => [relative(PUBLIC, p), sha256(readFileSync(p))]),
   );
   const previous = existsSync(MANIFEST) ? (JSON.parse(readFileSync(MANIFEST, "utf8")) as Manifest) : null;
-  if (previous && existsSync(ARCHIVE) && JSON.stringify(previous.files) === JSON.stringify(files)) {
+  if (!force && previous && existsSync(ARCHIVE) && JSON.stringify(previous.files) === JSON.stringify(files)) {
     console.log("assets unchanged, archive kept");
     return;
   }
   // gzip headers carry a timestamp, so the archive is only rewritten when the content changed (above).
-  run(["tar", "-czf", ARCHIVE, "-C", PUBLIC, ...Object.keys(files)]);
+  // COPYFILE_DISABLE: macOS tar would otherwise add a `._<name>` AppleDouble entry per file, which GNU tar on Linux
+  // extracts as real files. The listing below is checked raw, so a stray one fails the pack right here.
+  run(["tar", "-czf", ARCHIVE, "-C", PUBLIC, ...Object.keys(files)], { COPYFILE_DISABLE: "1" });
   const archive = readFileSync(ARCHIVE);
+  const stray = listTarGz(archive).filter((e) => isAppleDouble(e.name) || e.type !== "-");
+  if (stray.length > 0) throw new Error(`packed archive has ${stray.length} unexpected entries, e.g. ${stray[0]!.name}`);
   const manifest: Manifest = { archiveSha256: sha256(archive), archiveBytes: archive.byteLength, files };
   writeFileSync(MANIFEST, `${JSON.stringify(manifest, null, 2)}\n`);
   writeFileSync(STAMP, manifest.archiveSha256);
@@ -62,15 +66,17 @@ function copyBasis(): void {
   for (const f of ["basis_transcoder.js", "basis_transcoder.wasm"]) copyFileSync(join(src, f), join(out, f));
 }
 
-function extract(manifest: Manifest): number {
+function extract(archive: Uint8Array, manifest: Manifest): number {
   // Only regular files at our own relative paths under assets/, and only the ones the manifest knows, may be written.
-  const entries = parseTarListing(run(["tar", "-tzf", ARCHIVE]), run(["tar", "-tvzf", ARCHIVE]));
+  const entries = listTarGz(archive);
   const bad = badEntries(entries, new Set(Object.keys(manifest.files)));
   if (bad.length > 0) throw new Error(`refusing to extract: ${bad.slice(0, 3).join("; ")}${bad.length > 3 ? ` (+${bad.length - 3})` : ""}`);
   rmSync(STAMP, { force: true });
   mkdirSync(PUBLIC, { recursive: true });
-  run(["tar", "-xzf", ARCHIVE, "-C", PUBLIC]);
-  return entries.length;
+  // `._*` sidecars (older archives packed on macOS) are skipped on every platform; bsdtar and GNU tar both match the
+  // pattern against each path component.
+  run(["tar", "-xzf", ARCHIVE, "-C", PUBLIC, "--exclude=._*"]);
+  return entries.filter((e) => !isAppleDouble(e.name)).length;
 }
 
 function unpack(): void {
@@ -90,7 +96,7 @@ function unpack(): void {
   while (problems.length > 0 && extracted < 2) {
     if (extracted > 0 || stampHit) console.warn(`⚠ ${problems.length} asset file(s) missing or changed, extracting again: ${problems[0]}`);
     extracted++;
-    const count = extract(manifest);
+    const count = extract(archive, manifest);
     problems = verifyFiles(PUBLIC, manifest.files);
     if (problems.length === 0) console.log(`extracted ${count} asset files into web/public/assets`);
   }
@@ -101,6 +107,6 @@ function unpack(): void {
 }
 
 const cmd = process.argv[2];
-if (cmd === "pack") pack();
+if (cmd === "pack") pack(process.argv.includes("--force"));
 else if (cmd === "unpack") unpack();
-else throw new Error("usage: bun scripts/assets/archive.ts pack|unpack");
+else throw new Error("usage: bun scripts/assets/archive.ts pack [--force]|unpack");

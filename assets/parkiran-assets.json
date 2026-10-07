@@ -1,6 +1,6 @@
 {
-  "archiveSha256": "b4cbb51befa4eb157e243ad5cda1670c70391beba3592f7c7a9aebb32e00b528",
-  "archiveBytes": 30308421,
+  "archiveSha256": "6734a7e8778819884a0379eae53f2fc947048d46308fe5c26e8b8fc17cdb901b",
+  "archiveBytes": 30302253,
   "files": {
     "assets/character/character.glb": "0e4a5b46e2b6942828ab45dcf9e9afbee4b659c71cdf49f5330426700a24549a",
     "assets/character/clips.json": "0d1a11d3955ad23e2af201b2e437e28ed98430d4bd137afa092cdf43c5e2545a",

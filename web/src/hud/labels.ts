@@ -253,3 +253,17 @@ export function sessionName(s: Pick<PublicSession, "id" | "project">, twins: Rea
   const project = s.project ?? "?";
   return n && n > 1 ? `${project} #${n}` : project;
 }
+
+/** Event moods that belong under the feed's "Needs you" filter (and count while the feed is folded). */
+export const ATTENTION_MOODS: ReadonlySet<Mood> = new Set<Mood>(["needs", "trouble"]);
+
+/** How many attention events arrived after `seenSeq` (the newest cue when the feed was folded). */
+export function unseenAttention(
+  entries: readonly { cue: Cue; seq: number }[],
+  seenSeq: number,
+  sessions: Readonly<Record<string, Pick<PublicSession, "need">>>,
+): number {
+  let n = 0;
+  for (const e of entries) if (e.seq > seenSeq && ATTENTION_MOODS.has(cueLine(e.cue, sessions[e.cue.sessionId]).mood)) n++;
+  return n;
+}

@@ -1,9 +1,9 @@
 import { afterAll, describe, expect, test } from "bun:test";
 import { createHash } from "node:crypto";
-import { mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { badEntries, isSafeAssetPath, parseTarListing, verifyFiles } from "../assets/verify.ts";
+import { badEntries, isAppleDouble, isSafeAssetPath, listTarGz, verifyFiles } from "../assets/verify.ts";
 
 const dir = mkdtempSync(join(tmpdir(), "parkiran-tar-"));
 afterAll(() => rmSync(dir, { recursive: true, force: true }));
@@ -11,14 +11,13 @@ afterAll(() => rmSync(dir, { recursive: true, force: true }));
 const sha = (s: string) => createHash("sha256").update(s).digest("hex");
 
 function tar(args: string[]): string {
-  const r = Bun.spawnSync(["tar", ...args], { cwd: dir, stdout: "pipe", stderr: "pipe" });
+  // Like the pack script: without COPYFILE_DISABLE, macOS tar adds a `._*` sidecar for every file with an xattr.
+  const r = Bun.spawnSync(["tar", ...args], { cwd: dir, stdout: "pipe", stderr: "pipe", env: { ...process.env, COPYFILE_DISABLE: "1" } });
   if (r.exitCode !== 0) throw new Error(r.stderr.toString());
   return r.stdout.toString();
 }
 
-function listing(archive: string) {
-  return parseTarListing(tar(["-tzf", archive]), tar(["-tvzf", archive]));
-}
+const listing = (archive: string) => listTarGz(readFileSync(archive));
 
 describe("archive listing filter", () => {
   const pub = join(dir, "public");
@@ -68,8 +67,24 @@ describe("archive listing filter", () => {
     }
   });
 
-  test("listings of different length are refused", () => {
-    expect(() => parseTarListing("a\nb\n", "-rw-r--r-- x a\n")).toThrow(/disagree/);
+  test("macOS AppleDouble sidecars are listed raw, recognised, and skipped by the filter", () => {
+    // A file literally named `._a.txt` stands in for the sidecar macOS tar adds next to a file with extended attributes.
+    writeFileSync(join(pub, "assets", "._a.txt"), "sidecar");
+    const archive = join(dir, "sidecar.tgz");
+    tar(["-czf", archive, "-C", pub, "assets/._a.txt", "assets/a.txt"]);
+    const entries = listing(archive);
+    expect(entries.map((e) => e.name)).toEqual(["assets/._a.txt", "assets/a.txt"]);
+    expect(isAppleDouble("assets/._a.txt") && isAppleDouble("._top") && !isAppleDouble("assets/a._b")).toBe(true);
+    expect(badEntries(entries, expected)).toEqual([]);
+  });
+
+  test("long paths (pax headers) are listed with their full name", () => {
+    const deep = `assets/${"long-directory-name-".repeat(6)}/file.bin`;
+    mkdirSync(join(pub, deep, ".."), { recursive: true });
+    writeFileSync(join(pub, deep), "deep");
+    const archive = join(dir, "long.tgz");
+    tar(["-czf", archive, "-C", pub, deep]);
+    expect(listing(archive)).toEqual([{ name: deep, type: "-" }]);
   });
 });
 

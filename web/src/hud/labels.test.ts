@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import type { PublicSession } from "../../../shared/src/protocol.ts";
 import type { Cue } from "../../../shared/src/session.ts";
-import { assignTwinNumbers, cueLine, formatAge, formatToolName, moodCounts, orderSessions, sessionName, stateLabel } from "./labels.ts";
+import { assignTwinNumbers, cueLine, formatAge, formatToolName, moodCounts, orderSessions, sessionName, stateLabel, unseenAttention } from "./labels.ts";
 
 const session = (over: Partial<PublicSession>): PublicSession =>
   ({ id: "s", phase: "idle", work: "other", need: null, dozing: false, lastOutcome: null, subagents: {}, ...over }) as unknown as PublicSession;
@@ -107,5 +107,18 @@ describe("labels", () => {
     twins = assignTwinNumbers(twins, [b]);
     expect(twins.size).toBe(0);
     expect(sessionName(b, twins)).toBe("parkiran");
+  });
+
+  test("a folded feed counts only the attention events that arrived after it was folded", () => {
+    const entries = [
+      { seq: 1, cue: { kind: "needStarted", sessionId: "s", need: "permission" } as Cue },
+      { seq: 2, cue: { kind: "turnDone", sessionId: "s" } as Cue },
+      { seq: 3, cue: { kind: "failure", sessionId: "s", source: "tool" } as Cue },
+      { seq: 4, cue: { kind: "needResolved", sessionId: "s", outcome: "denied" } as Cue },
+      { seq: 5, cue: { kind: "milestone", sessionId: "s", milestone: "calls", value: 100 } as Cue },
+    ];
+    expect(unseenAttention(entries, 0, {})).toBe(3);
+    expect(unseenAttention(entries, 3, {})).toBe(1);
+    expect(unseenAttention(entries, 5, {})).toBe(0);
   });
 });
