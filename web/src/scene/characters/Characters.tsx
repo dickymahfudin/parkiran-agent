@@ -205,7 +205,8 @@ export function Characters() {
     smokeSources.set("pak-joko:steam", steam);
     return { smoke, steam };
   }, [smokeSources]);
-  const initialIds = useRef<Set<string> | null>(null);
+  /** Entry keys (sessions and friends) already in the lot when the page loaded: they start seated, everyone else walks in. */
+  const initialKeys = useRef<Set<string> | null>(null);
   const lastCueSeq = useRef(0);
   const synced = useRef<{ sessions: unknown; cueSeq: number; at: number } | null>(null);
   const visits = useRef(new Map<string, string>());
@@ -238,7 +239,7 @@ export function Characters() {
     // Targets only change with the sessions (and chat windows with the clock); otherwise everything below is skipped.
     if (!changed && synced.current?.sessions === st.sessions && synced.current.cueSeq === st.cueSeq && wall - synced.current.at < RESYNC_MS) return;
     synced.current = { sessions: st.sessions, cueSeq: st.cueSeq, at: wall };
-    initialIds.current ??= new Set(Object.keys(st.sessions));
+    initialKeys.current ??= new Set(Object.values(st.sessions).flatMap((s) => [s.id, ...Object.keys(s.subagents).map((id) => friendKey(s.id, id))]));
     const now = serverNow();
     const wanted = new Set<string>();
 
@@ -246,7 +247,7 @@ export function Characters() {
       let e = entries.current.get(key);
       if (!e) {
         const look = lookFor(agentId ?? sessionId);
-        const atHome = initialIds.current!.has(sessionId) && (agentId === null || target.kind !== "gone");
+        const atHome = initialKeys.current!.has(key) && (agentId === null || target.kind !== "gone");
         const smoke: SmokeSource = { active: false, world: new THREE.Vector3(), kind: "smoke" };
         const steam: SmokeSource = { active: false, world: new THREE.Vector3(), kind: "steam" };
         e = {

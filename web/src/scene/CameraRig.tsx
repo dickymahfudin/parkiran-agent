@@ -31,6 +31,12 @@ const BODY_PARTS: [RegExp, number][] = [
   [/Spine2$/, 0.2],
   [/Hips$/, 0.2],
 ];
+/** Visible, with every ancestor visible (what the renderer draws). */
+function shown(o: THREE.Object3D): boolean {
+  for (let p: THREE.Object3D | null = o; p; p = p.parent) if (!p.visible) return false;
+  return true;
+}
+
 /** Raycasting the scenery is the costly part of a wheel step; trackpads fire dozens per second. */
 const PICK_EVERY_MS = 120;
 /** The scenery list for picking is rebuilt now and then (props come and go as assets load). */
@@ -144,6 +150,8 @@ export function CameraRig({ position, target }: { position: Vec3; target: Vec3 }
         scene.traverse((o) => {
           const m = o as THREE.Mesh;
           if (!m.isMesh || (m as THREE.SkinnedMesh).isSkinnedMesh || (m as THREE.InstancedMesh).isInstancedMesh) return;
+          // The raycaster tests layers, not visibility: StaticMerge keeps hundreds of merged sources hidden in the graph.
+          if (!shown(m)) return;
           // Leaves, decals and glass: costly to test and nothing anyone zooms into.
           const mat = (Array.isArray(m.material) ? m.material[0] : m.material) as THREE.Material | undefined;
           if (mat && (mat.transparent || mat.alphaTest > 0)) return;

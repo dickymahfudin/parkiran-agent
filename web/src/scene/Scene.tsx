@@ -97,11 +97,15 @@ function FrameLimiter() {
 /** Fill rate dominates (AO + bloom + MSAA): resolution steps down before the frame rate does, without a React render. */
 function AdaptiveResolution() {
   const setDpr = useThree((s) => s.setDpr);
+  const compact = useApp((s) => s.compact);
   const level = useRef<number>(DPR_STEPS.length - 1);
+  // Compact mode (a second monitor) caps the resolution whatever the monitor's verdict is.
+  const apply = (i: number) => setDpr(compact ? Math.min(COMPACT_DPR, DPR_STEPS[i]!) : DPR_STEPS[i]!);
+  useEffect(() => apply(level.current), [compact]);
   const to = (i: number) => {
     if (i === level.current) return;
     level.current = i;
-    setDpr(DPR_STEPS[i]!);
+    apply(i);
   };
   return (
     <PerformanceMonitor

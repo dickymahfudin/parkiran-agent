@@ -234,6 +234,9 @@ export class Brain {
     this.queue = [];
     this.step = null;
     this.pendingReactions = [];
+    // Jumping to the resting state is not an arrival: no wave round with the neighbours afterwards.
+    this.arriving = false;
+    this.arrived = false;
     if (t === null) return;
     if (t.kind === "gone") {
       this.done = true;
@@ -323,8 +326,10 @@ export class Brain {
   react(kind: Reaction): void {
     if (this.posture === "offstage" || this.target?.kind === "gone") return;
     const queued = (clip: Clip) => this.pendingReactions.some((s) => s.type === "clip" && s.clip === clip);
-    if (kind === "failure") this.pendingReactions.push(this.clipStep("frustrated", FRUSTRATED_S));
-    else if (kind === "wave") {
+    // One facepalm per burst: a run of tool failures would otherwise queue a 2.4 s gesture each.
+    if (kind === "failure") {
+      if (!queued("frustrated")) this.pendingReactions.push(this.clipStep("frustrated", FRUSTRATED_S));
+    } else if (kind === "wave") {
       if (!queued("wave")) this.pendingReactions.push(this.clipStep("wave", WAVE_S));
     } else if (this.posture === "seated" && this.perch === this.home && this.target?.kind === "seated" && !queued("stretch")) {
       this.pendingReactions.push(this.clipStep("stretch", STRETCH_S, { props: { done: true }, propsEnd: { done: false } }));

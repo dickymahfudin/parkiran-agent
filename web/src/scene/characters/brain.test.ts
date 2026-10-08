@@ -299,6 +299,34 @@ describe("Brain", () => {
     expect(last.clip).toBe("type");
   });
 
+  test("a burst of tool failures plays one facepalm, not one per failure", () => {
+    const b = seatedBrain();
+    for (let i = 0; i < 5; i++) b.react("failure");
+    let facepalms = 0;
+    let prev: Clip | null = null;
+    runFor(b, 16, (f) => {
+      if (f.clip === "frustrated" && prev !== "frustrated") facepalms++;
+      prev = f.clip;
+    });
+    expect(facepalms).toBe(1);
+  });
+
+  test("settling a hidden tab is not an arrival: no greeting round when the person next sits down", () => {
+    const b = new Brain({ seed: 3, home, atHome: false, target: WORK });
+    b.setTarget(WORK, null, 0);
+    runFor(b, 2);
+    expect(b.state.posture).toBe("standing");
+    b.settle();
+    expect(b.takeArrival()).toBe(false);
+    b.setTarget({ kind: "needs", need: "permission" }, null, 3);
+    runFor(b, 4);
+    b.setTarget(WORK, { kind: "approved", at: 4 }, 4);
+    let arrivals = 0;
+    runFor(b, 10, () => (arrivals += b.takeArrival() ? 1 : 0));
+    expect(arrivals).toBe(0);
+    expect(b.state.posture).toBe("seated");
+  });
+
   test("dozes with Zzz, wakes when work resumes", () => {
     const b = seatedBrain({ kind: "seated", activity: "doze" });
     expect(runFor(b, 1).last.props.zzz).toBe(true);

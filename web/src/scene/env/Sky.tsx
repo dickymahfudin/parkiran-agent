@@ -156,6 +156,15 @@ export function Sky() {
       pmrem.dispose();
     };
   }, [cubeTarget, pmrem]);
+  useEffect(() => {
+    // After a lost context three re-uploads textures that have CPU data; the PMREM environment has none and would
+    // stay black at a steady time of day. Forget the last capture so the next frame renders it again.
+    const restored = () => {
+      lastEnv.current = { at: -Infinity, key: "", count: 0 };
+    };
+    gl.domElement.addEventListener("webglcontextrestored", restored);
+    return () => gl.domElement.removeEventListener("webglcontextrestored", restored);
+  }, [gl]);
 
   useFrame((state) => {
     const l = envState.lighting;

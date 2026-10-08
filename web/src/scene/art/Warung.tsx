@@ -211,19 +211,19 @@ export function Warung() {
   const tarpMat = useMemo(() => new THREE.MeshStandardMaterial({ color: "#2a62b8", roughness: 0.62, side: THREE.DoubleSide }), []);
   const signMat = useMemo(() => new THREE.MeshStandardMaterial({ map: signTexture(), roughness: 0.7 }), []);
   const menuMat = useMemo(() => new THREE.MeshStandardMaterial({ map: menuTexture(), roughness: 0.9 }), []);
-  const neonMat = useMemo(
-    () =>
-      new THREE.MeshStandardMaterial({
-        map: neonTexture(),
-        transparent: true,
-        emissive: "#ff3d7f",
-        emissiveMap: neonTexture(),
-        emissiveIntensity: 0,
-        color: "#ff8fb4",
-        depthWrite: false,
-      }),
-    [],
-  );
+  const neonMat = useMemo(() => {
+    // One canvas for both maps (two identical textures were painted and uploaded before).
+    const neon = neonTexture();
+    return new THREE.MeshStandardMaterial({
+      map: neon,
+      transparent: true,
+      emissive: "#ff3d7f",
+      emissiveMap: neon,
+      emissiveIntensity: 0,
+      color: "#ff8fb4",
+      depthWrite: false,
+    });
+  }, []);
   const bulbMat = useMemo(() => new THREE.MeshStandardMaterial({ color: "#fff3d6", emissive: "#ffcf8a", emissiveIntensity: 0 }), []);
   const tubeMat = useMemo(() => new THREE.MeshStandardMaterial({ color: "#f4f8ff", emissive: "#e8f1ff", emissiveIntensity: 0 }), []);
   const fridgeMat = useMemo(
@@ -238,6 +238,8 @@ export function Warung() {
 
   // Under the warung roof and awning, in their shade already: these small things cast no shadow of their own.
   const thermos = useModel("plastic_thermos", { cast: false });
+  // Cloned once: an inline clone in JSX made a new thermos on every render (a compact toggle left two on the counter).
+  const thermos2 = useMemo(() => thermos.clone(), [thermos]);
   const crate1 = useModel("plastic_crate_01");
   const crate2 = useModel("plastic_crate_02");
   const gallon = useModel("plastic_bottle_gallon");
@@ -326,7 +328,7 @@ export function Warung() {
         </mesh>
       ))}
       <primitive object={thermos} position={[FRONT_X + 0.38, 0.96, -4.35]} scale={1.4} />
-      <primitive object={thermos.clone()} position={[FRONT_X + 0.34, 0.96, -4.6]} rotation={[0, 1.2, 0]} scale={1.4} />
+      <primitive object={thermos2} position={[FRONT_X + 0.34, 0.96, -4.6]} rotation={[0, 1.2, 0]} scale={1.4} />
       {/* Menu board on the counter front, neon on the facade */}
       <mesh position={[FRONT_X - 0.04, 1.15, -4.62]} rotation={[0, -Math.PI / 2, 0]} material={menuMat}>
         <planeGeometry args={[0.46, 0.69]} />
