@@ -84,3 +84,33 @@ describe("parseServerMessage", () => {
     expect(() => parseServerMessage("hello")).toThrow(/not an object/);
   });
 });
+
+describe("store after a reconnect", () => {
+  test("hello drops a selection and acknowledgements of sessions that are gone", () => {
+    const st = useApp.getState();
+    st.apply(hello([session("keep"), session("gone")]));
+    useApp.setState({ acknowledged: { keep: 1, gone: 2 } });
+    useApp.getState().select("gone");
+    expect(useApp.getState().selectedId).toBe("gone");
+    useApp.getState().apply(hello([session("keep")]));
+    expect(useApp.getState().selectedId).toBeNull();
+    expect(useApp.getState().acknowledged).toEqual({ keep: 1 });
+  });
+
+  test("a session removed by a delta takes its acknowledgement with it", () => {
+    useApp.getState().apply(hello([session("p"), session("q")]));
+    useApp.setState({ acknowledged: { p: 1, q: 2 } });
+    useApp.getState().apply({ type: "sessions", serverTime: Date.now(), updated: [], removed: ["q"] });
+    expect(useApp.getState().acknowledged).toEqual({ p: 1 });
+  });
+
+  test("a late frame does not pull the clock back; a hello resets it", () => {
+    const near = (a: number, b: number) => Math.abs(a - b) < 50;
+    useApp.getState().apply({ ...hello([]), serverTime: Date.now() + 5000 });
+    expect(near(useApp.getState().clockOffset, 5000)).toBe(true);
+    useApp.getState().apply({ type: "cues", serverTime: Date.now() + 4700, cues: [] });
+    expect(near(useApp.getState().clockOffset, 5000)).toBe(true);
+    useApp.getState().apply({ ...hello([]), serverTime: Date.now() + 1000 });
+    expect(near(useApp.getState().clockOffset, 1000)).toBe(true);
+  });
+});

@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import SunCalc from "suncalc";
-import { applyTimeOverride, atLotClock, sunPosition } from "../src/sun.ts";
+import { applyTimeOverride, atLotClock, isClockTime, sunPosition } from "../src/sun.ts";
 
 const JAKARTA = { lat: -6.2, lon: 106.8 };
 // Jakarta is UTC+7 all year.
@@ -82,5 +82,12 @@ describe("atLotClock", () => {
   test("a viewer behind the lot at night does not get daylight", () => {
     const londonMidnight = new Date("2026-03-20T00:00:00+00:00");
     expect(sunPosition(atLotClock(londonMidnight, JAKARTA.lon, 0), JAKARTA.lat, JAKARTA.lon).elevation).toBeLessThan(-30);
+  });
+});
+
+describe("isClockTime", () => {
+  test("accepts HH:MM and H:MM within the day, rejects anything else", () => {
+    for (const ok of ["00:00", "7:05", "17:30", "23:59"]) expect(isClockTime(ok)).toBe(true);
+    for (const bad of ["foo", "24:00", "12:60", "12", "12:5", "", " 12:00"]) expect(isClockTime(bad)).toBe(false);
   });
 });

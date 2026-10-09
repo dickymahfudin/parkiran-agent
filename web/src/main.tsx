@@ -2,18 +2,17 @@ import "@fontsource-variable/plus-jakarta-sans";
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import { App } from "./App.tsx";
+import { createReloadGuard } from "./net/reloadGuard.ts";
 import "./styles.css";
 
 const root = document.getElementById("root");
 if (!root) throw new Error("#root missing");
 
 // A page opened before a rebuild asks for chunks the rebuild deleted (e.g. the trees): reload once to pick up the new
-// build. A second failure within a minute is a real error and surfaces instead of reloading in a loop.
-const RELOADED_AT = "parkiran:reloaded-for-new-build";
-const RELOAD_GUARD_MS = 60_000;
+// build. Storage may be blocked; the guard then keeps its time in memory instead of throwing here.
+const shouldReload = createReloadGuard(() => sessionStorage);
 window.addEventListener("vite:preloadError", (event) => {
-  if (Date.now() - Number(sessionStorage.getItem(RELOADED_AT) ?? 0) < RELOAD_GUARD_MS) return;
-  sessionStorage.setItem(RELOADED_AT, String(Date.now()));
+  if (!shouldReload(Date.now())) return;
   event.preventDefault();
   location.reload();
 });

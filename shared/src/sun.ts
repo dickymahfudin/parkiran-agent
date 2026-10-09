@@ -64,6 +64,11 @@ export function atLotClock(date: Date, lon: number, viewerOffsetMin: number = -d
 /**
  * `HH:MM` override applied to today's local date (debug `?time=`). Returns null when malformed.
  */
+/** `HH:MM` with a real hour (0–23) and minute (0–59), as `?time=` and the presets use. */
+export function isClockTime(hhmm: string): boolean {
+  return applyTimeOverride(new Date(0), hhmm) !== null;
+}
+
 export function applyTimeOverride(base: Date, hhmm: string): Date | null {
   const match = /^(\d{1,2}):(\d{2})$/.exec(hhmm);
   if (!match) return null;

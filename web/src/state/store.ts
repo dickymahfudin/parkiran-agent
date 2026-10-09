@@ -1,8 +1,10 @@
 import { create } from "zustand";
 import type { ClientConfig, PublicSession, ServerMessage, UsageSnapshot } from "../../../shared/src/protocol.ts";
 import type { Cue } from "../../../shared/src/session.ts";
+import { isClockTime } from "../../../shared/src/sun.ts";
 import { assignTwinNumbers } from "../hud/labels.ts";
 import { isTimeMode, presetTime, type TimeMode } from "../scene/env/timeOfDay.ts";
+import { keepSelection, nextClockOffset, pruneAcknowledged } from "./sync.ts";
 
 export type ConnectionStatus = "connecting" | "open" | "closed";
 
@@ -52,6 +54,13 @@ function savedTimeMode(): TimeMode {
   } catch {
     return "auto";
   }
+}
+
+function urlTime(raw: string | null): string | null {
+  if (raw === null) return null;
+  if (isClockTime(raw)) return raw;
+  console.warn(`ignoring ?time=${raw}: expected HH:MM`);
+  return null;
 }
 
 interface AppState {
@@ -119,7 +128,8 @@ export const useApp = create<AppState>((set) => ({
   cueSeq: 0,
   selectedId: null,
   twins: new Map(),
-  timeOverride: params.get("time") ?? presetTime(savedTimeMode()),
+  // A malformed `?time=` (the toolbar clock showed "NaN:undefined") falls back to the saved mode.
+  timeOverride: urlTime(params.get("time")) ?? presetTime(savedTimeMode()),
   assetErrors: [],
   readyParts: [],
   cameraMode: params.has("cinematic") ? "cinematic" : "orbit",
@@ -146,22 +156,33 @@ export const useApp = create<AppState>((set) => ({
 
   apply: (msg) =>
     set((state) => {
-      const clockOffset = msg.serverTime - Date.now();
+      // The best offset so far: one late frame must not move "now" backwards (the ages would flicker).
+      const clockOffset = nextClockOffset(state.clockOffset, msg.serverTime - Date.now(), msg.type === "hello");
       switch (msg.type) {
-        case "hello":
+        case "hello": {
+          // A reconnect or a server restart: whatever the old world had selected or acknowledged may be gone.
+          const sessions = Object.fromEntries(msg.sessions.map((s) => [s.id, s]));
           return {
             clockOffset,
             config: msg.config,
             usage: msg.usage,
-            sessions: Object.fromEntries(msg.sessions.map((s) => [s.id, s])),
+            sessions,
+            selectedId: keepSelection(state.selectedId, sessions),
+            acknowledged: pruneAcknowledged(state.acknowledged, sessions),
             twins: assignTwinNumbers(state.twins, msg.sessions),
           };
+        }
         case "sessions": {
           const sessions = { ...state.sessions };
           for (const s of msg.updated) sessions[s.id] = s;
           for (const id of msg.removed) delete sessions[id];
-          const selectedId = state.selectedId && sessions[state.selectedId] ? state.selectedId : null;
-          return { clockOffset, sessions, selectedId, twins: assignTwinNumbers(state.twins, Object.values(sessions)) };
+          return {
+            clockOffset,
+            sessions,
+            selectedId: keepSelection(state.selectedId, sessions),
+            acknowledged: msg.removed.length > 0 ? pruneAcknowledged(state.acknowledged, sessions) : state.acknowledged,
+            twins: assignTwinNumbers(state.twins, Object.values(sessions)),
+          };
         }
         case "cues": {
           let seq = state.cueSeq;

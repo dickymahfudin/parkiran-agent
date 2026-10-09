@@ -48,11 +48,16 @@ class SoundEngine {
   /** Call from a user gesture. Safe to call repeatedly. */
   start(): void {
     if (this.ctx) {
-      void this.ctx.resume();
+      this.resume();
       return;
     }
     const ctx = new AudioContext();
     this.ctx = ctx;
+    // Safari and iOS suspend (or "interrupt") the context in the background and on a phone call; it does not come back
+    // by itself. Try again as soon as it stops; if the browser wants a gesture, the next click or key does it (App).
+    ctx.onstatechange = () => {
+      if (this.enabled && ctx.state !== "running" && ctx.state !== "closed" && !document.hidden) this.resume();
+    };
     this.master = ctx.createGain();
     this.master.gain.value = this.enabled ? MASTER : 0;
     const comp = ctx.createDynamicsCompressor();
@@ -120,6 +125,14 @@ class SoundEngine {
   setEnabled(on: boolean): void {
     this.enabled = on;
     if (this.master && this.ctx) this.master.gain.setTargetAtTime(on ? MASTER : 0, this.ctx.currentTime, 0.2);
+    if (on) this.resume();
+  }
+
+  /** Brings a suspended or interrupted context back. A no-op before the first click and while it runs. */
+  resume(): void {
+    const ctx = this.ctx;
+    if (!ctx || ctx.state === "running" || ctx.state === "closed") return;
+    ctx.resume().catch((err: unknown) => console.warn("audio could not resume yet (waiting for a click or key)", err));
   }
 
   /** The continuous layers on or off; the cues are not affected. */
@@ -139,8 +152,14 @@ class SoundEngine {
   }
 
   /** For the dev console and checks: the current mix targets. */
-  get mix(): { enabled: boolean; ambience: boolean; ducked: boolean; ambienceGain: number | null } {
-    return { enabled: this.enabled, ambience: this.ambienceOn, ducked: this.ducked, ambienceGain: this.ambienceBus?.gain.value ?? null };
+  get mix(): { enabled: boolean; ambience: boolean; ducked: boolean; ambienceGain: number | null; state: string | null } {
+    return {
+      enabled: this.enabled,
+      ambience: this.ambienceOn,
+      ducked: this.ducked,
+      ambienceGain: this.ambienceBus?.gain.value ?? null,
+      state: this.ctx?.state ?? null,
+    };
   }
 
   /**
