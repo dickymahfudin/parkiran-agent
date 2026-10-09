@@ -25,7 +25,18 @@ function useFirstClick(): void {
   }, []);
   const audioEnabled = useApp((s) => s.audioEnabled);
   const audioUnlocked = useApp((s) => s.audioUnlocked);
+  const ambienceEnabled = useApp((s) => s.ambienceEnabled);
   useEffect(() => sound.setEnabled(audioEnabled && audioUnlocked), [audioEnabled, audioUnlocked]);
+  useEffect(() => sound.setAmbience(ambienceEnabled), [ambienceEnabled]);
+  // Watching from another window: the street and the keyboards drop to a murmur, the chime and the "ting" do not.
+  useEffect(() => {
+    const update = () => sound.setDucked(document.hidden || !document.hasFocus());
+    update();
+    for (const ev of ["visibilitychange", "focus", "blur"]) window.addEventListener(ev, update);
+    return () => {
+      for (const ev of ["visibilitychange", "focus", "blur"]) window.removeEventListener(ev, update);
+    };
+  }, []);
 }
 
 export function App() {

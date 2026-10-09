@@ -2,14 +2,14 @@
 // (keyboards while sessions work, engines of the traffic going by); one-shots for the lighter and notifications.
 // Nothing plays until the page has been clicked (browser autoplay policy).
 // Laptop speakers reproduce almost nothing below ~200 Hz, so every layer has its body in the 300 Hz – 5 kHz band.
+// Two buses: the ambience (street, keyboards, crickets, birds, engines, vendor calls) can be turned off or ducked on its
+// own; the cues (chime, "ting", lighter) always play at full level while sound is on.
 import type { Lighting } from "../scene/env/dayNight.ts";
+import { ambienceLevel, keysPerSecond } from "./mix.ts";
 
 const MASTER = 0.7;
 /** Seconds of keyboard clicks scheduled per ambience call (called every ~0.5 s). */
 const KEY_WINDOW = 0.5;
-/** Key presses per second for one person typing. */
-const KEYS_PER_TYPIST = 3.2;
-const MAX_TYPISTS = 6;
 /** Engine voices update their parameters at most this often (s). */
 const VOICE_UPDATE = 0.05;
 
@@ -34,6 +34,10 @@ class SoundEngine {
   private master: GainNode | null = null;
   /** Everything mixes here, then a compressor keeps the sum loud without clipping. */
   private bus: GainNode | null = null;
+  /** The continuous layers, into `bus`; its gain is the ambience toggle and the background duck. */
+  private ambienceBus: GainNode | null = null;
+  private ambienceOn = true;
+  private ducked = false;
   private noise: AudioBuffer | null = null;
   private city: GainNode | null = null;
   private crickets: GainNode | null = null;
@@ -59,6 +63,9 @@ class SoundEngine {
     comp.release.value = 0.25;
     this.bus = ctx.createGain();
     this.bus.connect(comp).connect(this.master).connect(ctx.destination);
+    this.ambienceBus = ctx.createGain();
+    this.ambienceBus.gain.value = ambienceLevel(this.ambienceOn, this.ducked);
+    this.ambienceBus.connect(this.bus);
     this.noise = noiseBuffer(ctx, 3);
 
     // Distant traffic: a band of road noise (what small speakers can play) over a low rumble, slowly swelling.
@@ -83,12 +90,12 @@ class SoundEngine {
     const rumbleGain = ctx.createGain();
     rumbleGain.gain.value = 0.8;
     rumble.connect(rumbleLow).connect(rumbleGain).connect(this.city);
-    this.city.connect(this.bus);
+    this.city.connect(this.ambienceBus);
 
     // Crickets: two insects, each a high tone gated by a fast pulse and a slower chirp rhythm.
     this.crickets = ctx.createGain();
     this.crickets.gain.value = 0;
-    this.crickets.connect(this.bus);
+    this.crickets.connect(this.ambienceBus);
     for (const [freq, pulseHz, rhythmHz, level] of [
       [4300, 38, 1.7, 1],
       [5100, 46, 2.3, 0.6],
@@ -115,6 +122,27 @@ class SoundEngine {
     if (this.master && this.ctx) this.master.gain.setTargetAtTime(on ? MASTER : 0, this.ctx.currentTime, 0.2);
   }
 
+  /** The continuous layers on or off; the cues are not affected. */
+  setAmbience(on: boolean): void {
+    this.ambienceOn = on;
+    this.applyAmbience();
+  }
+
+  /** Window in the background: the ambience drops to a murmur, the cues stay at full level. */
+  setDucked(on: boolean): void {
+    this.ducked = on;
+    this.applyAmbience();
+  }
+
+  private applyAmbience(): void {
+    if (this.ambienceBus && this.ctx) this.ambienceBus.gain.setTargetAtTime(ambienceLevel(this.ambienceOn, this.ducked), this.ctx.currentTime, 0.5);
+  }
+
+  /** For the dev console and checks: the current mix targets. */
+  get mix(): { enabled: boolean; ambience: boolean; ducked: boolean; ambienceGain: number | null } {
+    return { enabled: this.enabled, ambience: this.ambienceOn, ducked: this.ducked, ambienceGain: this.ambienceBus?.gain.value ?? null };
+  }
+
   /**
    * Called a few times a second. `typists`: people typing on their laptops right now; `closeness`: 1 at the default
    * view, higher when the camera is zoomed in on the lot.
@@ -132,7 +160,7 @@ class SoundEngine {
       this.nextBird = ctx.currentTime + (morning ? 1.5 + Math.random() * 4 : 8 + Math.random() * 12);
       this.bird();
     }
-    this.keys(Math.min(typists, MAX_TYPISTS), closeness);
+    this.keys(typists, closeness);
   }
 
   /**
@@ -212,7 +240,7 @@ class SoundEngine {
     out.pan.value = Math.max(-1, Math.min(1, pan));
     const level = ctx.createGain();
     level.gain.value = loudness;
-    level.connect(out).connect(this.bus);
+    level.connect(out).connect(this.ambienceBus!);
     const hits = kind === "bakso" ? 3 + Math.floor(Math.random() * 2) : 4 + Math.floor(Math.random() * 3);
     const gap = kind === "bakso" ? 0.2 : 0.15;
     for (let i = 0; i < hits; i++) {
@@ -290,7 +318,7 @@ class SoundEngine {
   }
 
   /** A short filtered noise click. */
-  private burst(t: number, length: number, type: BiquadFilterType, freq: number, q: number, peak: number, decay: number): void {
+  private burst(t: number, length: number, type: BiquadFilterType, freq: number, q: number, peak: number, decay: number, dest: AudioNode = this.bus!): void {
     const ctx = this.ctx!;
     const src = ctx.createBufferSource();
     src.buffer = this.noise;
@@ -301,7 +329,7 @@ class SoundEngine {
     const g = ctx.createGain();
     g.gain.setValueAtTime(peak, t);
     g.gain.exponentialRampToValueAtTime(0.0001, t + decay);
-    src.connect(f).connect(g).connect(this.bus!);
+    src.connect(f).connect(g).connect(dest);
     src.start(t, Math.random() * 2.5, length);
   }
 
@@ -310,11 +338,11 @@ class SoundEngine {
     if (typists <= 0) return;
     const ctx = this.ctx!;
     const level = 0.05 * Math.min(2.2, Math.max(0.5, closeness));
-    const count = Math.round(typists * KEYS_PER_TYPIST * KEY_WINDOW * (0.6 + Math.random() * 0.8));
+    const count = Math.round(keysPerSecond(typists) * KEY_WINDOW * (0.6 + Math.random() * 0.8));
     for (let i = 0; i < count; i++) {
       const t = ctx.currentTime + 0.05 + Math.random() * KEY_WINDOW;
-      if (Math.random() < 0.12) this.burst(t, 0.04, "bandpass", 900 + Math.random() * 200, 1.4, level * 0.9, 0.045);
-      else this.burst(t, 0.02, "bandpass", 2400 + Math.random() * 1600, 1.6, level * (0.6 + Math.random() * 0.4), 0.022);
+      if (Math.random() < 0.12) this.burst(t, 0.04, "bandpass", 900 + Math.random() * 200, 1.4, level * 0.9, 0.045, this.ambienceBus!);
+      else this.burst(t, 0.02, "bandpass", 2400 + Math.random() * 1600, 1.6, level * (0.6 + Math.random() * 0.4), 0.022, this.ambienceBus!);
     }
   }
 
@@ -331,7 +359,7 @@ class SoundEngine {
       g.gain.setValueAtTime(0, t);
       g.gain.linearRampToValueAtTime(0.08, t + 0.01);
       g.gain.exponentialRampToValueAtTime(0.0001, t + 0.08);
-      o.connect(g).connect(this.bus!);
+      o.connect(g).connect(this.ambienceBus!);
       o.start(t);
       o.stop(t + 0.1);
     }
@@ -343,7 +371,7 @@ class SoundEngine {
     const gain = ctx.createGain();
     gain.gain.value = 0;
     const pan = ctx.createStereoPanner();
-    gain.connect(pan).connect(this.bus!);
+    gain.connect(pan).connect(this.ambienceBus!);
     const motor = ctx.createBiquadFilter();
     motor.type = "lowpass";
     motor.frequency.value = kind === "scooter" ? 1700 : 700;

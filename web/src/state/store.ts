@@ -78,6 +78,8 @@ interface AppState {
   compact: boolean;
   /** User preference; sound only plays once the page has had a click (browser autoplay rule). */
   audioEnabled: boolean;
+  /** The continuous layers (street, keyboards, crickets, engines); the cues play whenever sound is on. */
+  ambienceEnabled: boolean;
   audioUnlocked: boolean;
   notificationsEnabled: boolean;
   /** The session list folded down to its header and summary (remembered in this browser). */
@@ -98,6 +100,7 @@ interface AppState {
   resetView(): void;
   setCompact(on: boolean): void;
   setAudioEnabled(on: boolean): void;
+  setAmbienceEnabled(on: boolean): void;
   unlockAudio(): void;
   setNotificationsEnabled(on: boolean): void;
   setSessionsCollapsed(on: boolean): void;
@@ -123,10 +126,10 @@ export const useApp = create<AppState>((set) => ({
   viewResets: 0,
   compact: params.has("compact"),
   audioEnabled: pref("audio", true),
+  ambienceEnabled: pref("ambience", true),
   audioUnlocked: false,
-  // Off until the bell is turned on: the permission prompt then comes from that click, not from the first click
-  // anywhere on the page (which browsers treat as unprompted and may block for good).
-  notificationsEnabled: pref("notifications", false),
+  // On by default (user's choice): the browser's permission prompt comes with the first click on the page.
+  notificationsEnabled: pref("notifications", true),
   sessionsCollapsed: pref("sessionsCollapsed", false),
   eventsCollapsed: pref("eventsCollapsed", false),
   acknowledged: {},
@@ -185,6 +188,10 @@ export const useApp = create<AppState>((set) => ({
   setAudioEnabled: (audioEnabled) => {
     savePref("audio", audioEnabled);
     set({ audioEnabled });
+  },
+  setAmbienceEnabled: (ambienceEnabled) => {
+    savePref("ambience", ambienceEnabled);
+    set({ ambienceEnabled });
   },
   unlockAudio: () => set({ audioUnlocked: true }),
   setNotificationsEnabled: (notificationsEnabled) => {

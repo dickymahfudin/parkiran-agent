@@ -123,8 +123,12 @@ the lot in between, now and then visiting someone at work.
 appear. About 570 draw calls and 650k triangles a frame with six people in the lot.
 
 **Sound:** procedural, no audio files: distant traffic, engines of the cars and ojek going by (panned and louder as they
-pass the camera), laptop keyboards while sessions work (louder when you zoom in), birds in the morning, crickets at
-night, the lighter, a soft "ting" when a turn is done, the food carts' calls, and the chime.
+pass the camera), laptop keyboards while sessions work (louder when you zoom in, capped for the whole lot so six
+sessions do not sound like a typing pool), birds in the morning, crickets at
+night, the food carts' calls, and the cues: the lighter, a soft "ting" when a turn is done, and the chime. The toolbar
+has two buttons: sound on/off, and the ambience on/off (street, keyboards, crickets, engines) with the cues kept, for a
+lot that only speaks up when it needs you. While the window is in the background the ambience drops to 30 % by
+itself; the cues stay at full level.
 
 **Time of day:** the scene clock in the toolbar is also a menu: **Auto** follows your clock, **Pagi** (07:00), **Siang**
 (12:00), **Sore** (17:30) and **Malam** (21:00) hold the lot at that time. Switching eases the sun round the clock in
@@ -143,10 +147,10 @@ monitor, sound, notifications and the time of day (plus a free time input in dev
 every part of the scene has arrived. States and events use stroke icons (Lucide), no emoji. Plain facts read in English; the warung jokes stay ("cari korek", "batal
 ngerokok", "bawa kopi").
 
-**Notifications:** when a session needs you, a chime plays (and repeats every 25 s). Turn on the bell in the toolbar
-once (the browser asks for permission then; the choice is remembered) and, when the page is not focused, you also
-get a system notification such as "warung-app needs permission" with the branch; it disappears as soon as the session
-is handled. Clicking the character silences the chime; it never changes the real session. Sound starts after your
+**Notifications:** when a session needs you, a chime plays (and repeats every 25 s); when the page is not focused you
+also get a system notification such as "warung-app needs permission" with the branch, which disappears as soon as the
+session is handled. The bell is on by default (the browser asks for permission on your first click) and can be turned
+off in the toolbar; the choice is remembered per browser. Clicking the character silences the chime; it never changes the real session. Sound starts after your
 first click on the page (browser rule).
 
 URL options: `?time=21:00` (fixed scene time), `?compact`, `?cinematic`, `?stats` (frame-rate meter); in dev mode also

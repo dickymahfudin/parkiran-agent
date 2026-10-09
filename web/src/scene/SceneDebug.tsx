@@ -1,6 +1,7 @@
 import { useFrame, useThree } from "@react-three/fiber";
 import { useEffect } from "react";
 import type * as THREE from "three";
+import { sound } from "../audio/sound.ts";
 import { useApp } from "../state/store.ts";
 import { beginFrame, timeControl } from "./timeControl.ts";
 
@@ -13,6 +14,8 @@ declare global {
       /** Puts the camera at `position` looking at `target` (the orbit pivot), like `?cam=` without a reload. */
       view(position: [number, number, number], target: [number, number, number]): void;
       store: typeof useApp;
+      /** The sound engine, for checking the mix from the console. */
+      sound: typeof sound;
       scene: THREE.Scene;
       camera: THREE.Camera;
       gl: THREE.WebGLRenderer;
@@ -44,6 +47,7 @@ export function DebugHandle() {
     };
     window.__parkiran = {
       render,
+      sound,
       manual: (on) => void (timeControl.manual = on),
       step: (seconds) => {
         timeControl.pending += seconds;
