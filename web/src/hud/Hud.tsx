@@ -407,7 +407,6 @@ function Toolbar() {
   const compact = useApp((st) => st.compact);
   const audioEnabled = useApp((st) => st.audioEnabled);
   const audioUnlocked = useApp((st) => st.audioUnlocked);
-  const ambienceEnabled = useApp((st) => st.ambienceEnabled);
   const notificationsEnabled = useApp((st) => st.notificationsEnabled);
   const timeOverride = useApp((st) => st.timeOverride);
   const set = useApp.getState();
@@ -453,17 +452,6 @@ function Toolbar() {
         aria-label="Sound"
       >
         <Icon name={audioEnabled ? "soundOn" : "soundOff"} />
-      </button>
-      <button
-        type="button"
-        className="tool-icon"
-        aria-pressed={ambienceEnabled}
-        disabled={!audioEnabled}
-        onClick={() => set.setAmbienceEnabled(!ambienceEnabled)}
-        title={ambienceEnabled ? "Ambience on: street, keyboards, crickets (the chime always plays)" : "Ambience off: only the chime, the ting and the lighter"}
-        aria-label="Ambience"
-      >
-        <Icon name={ambienceEnabled ? "ambienceOn" : "ambienceOff"} />
       </button>
       <button
         type="button"

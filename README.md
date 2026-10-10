@@ -118,17 +118,17 @@ the lot in between, now and then visiting someone at work.
 
 **Street:** cars and ojek share each lane single file and keep a safe gap to whoever is ahead.
 
-**Performance:** the scene renders at most 60 fps (evenly paced on 120 Hz screens) and 30 fps while another window has the focus (watching on a second screen), drops resolution in three steps
-(1.5 → 1.25 → 1) when frames run slow, and compiles every shader up front so props never stall a frame when they first
-appear. About 570 draw calls and 650k triangles a frame with six people in the lot.
+**Performance and battery:** 60 fps while the view moves (you drag, scroll or click, or the camera follows someone;
+evenly paced on 120 Hz screens), 30 fps while you watch sessions work from a still camera, 20 fps when every session is
+idle and nobody is selected, 15 fps with another window in front, and nothing at all in a hidden tab. After 3 s in the
+background it also renders light (resolution 1, no ambient occlusion) and comes back to full quality the moment the
+window does. Resolution drops in three steps (1.5 → 1.25 → 1) when frames run slow, and every shader is compiled up front
+so props never stall a frame when they first appear. About 570 draw calls and 650k triangles a frame with six people in
+the lot.
 
-**Sound:** procedural, no audio files: distant traffic, engines of the cars and ojek going by (panned and louder as they
-pass the camera), laptop keyboards while sessions work (louder when you zoom in, capped for the whole lot so six
-sessions do not sound like a typing pool), birds in the morning, crickets at
-night, the food carts' calls, and the cues: the lighter, a soft "ting" when a turn is done, and the chime. The toolbar
-has two buttons: sound on/off, and the ambience on/off (street, keyboards, crickets, engines) with the cues kept, for a
-lot that only speaks up when it needs you. While the window is in the background the ambience drops to 30 % by
-itself; the cues stay at full level.
+**Sound:** procedural cues, no audio files: the chime when a session needs you, a soft "ting" when a turn is done, the
+lighter, and the food carts' "ting-ting" / "tek-tek" as they pass. There is no background ambience (street, keyboards,
+crickets, engines): between cues the audio context sleeps, so it costs no battery and does not keep the Mac awake.
 
 **Time of day:** the scene clock in the toolbar is also a menu: **Auto** follows your clock, **Pagi** (07:00), **Siang**
 (12:00), **Sore** (17:30) and **Malam** (21:00) hold the lot at that time. Switching eases the sun round the clock in

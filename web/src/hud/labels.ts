@@ -27,8 +27,6 @@ export type IconName =
   | "expand"
   | "soundOn"
   | "soundOff"
-  | "ambienceOn"
-  | "ambienceOff"
   | "bellOn"
   | "bellOff"
   | "day"

@@ -1,5 +1,5 @@
 import { PerformanceMonitor, Stats } from "@react-three/drei";
-import { Canvas, useFrame, useThree } from "@react-three/fiber";
+import { Canvas, useThree } from "@react-three/fiber";
 import { Suspense, useEffect, useRef } from "react";
 import * as THREE from "three";
 import { Ambient } from "./art/Ambient.tsx";
@@ -19,10 +19,9 @@ import { DayNight } from "./env/DayNight.tsx";
 import { Post } from "./env/Post.tsx";
 import { Sky } from "./env/Sky.tsx";
 import { Characters } from "./characters/Characters.tsx";
-import { sound } from "../audio/sound.ts";
-import { useApp } from "../state/store.ts";
+import { serverNow, useApp } from "../state/store.ts";
 import { CameraRig } from "./CameraRig.tsx";
-import { envState } from "./env/envState.ts";
+import { ACTIVE_FPS, isLite, isQuietLot, minFrameSeconds, targetFps } from "./pace.ts";
 import { DebugHandle, SceneClock, cameraFromUrl } from "./SceneDebug.tsx";
 
 // Framed on the benches, the gerobak and the warung (where the people are), clear of the session list at the top left.
@@ -34,63 +33,71 @@ const SHOW_STATS = new URLSearchParams(location.search).has("stats");
 const COMPACT_DPR = 1;
 /** Resolution steps; few and far apart, since every change reallocates the composer's buffers (a visible hitch). */
 const DPR_STEPS = [1, 1.25, 1.5] as const;
-/** At most 60 frames a second, a few ms of vsync jitter allowed: every vsync at 60 Hz, every other one at 120 Hz. */
-const MIN_FRAME_S = 1 / 60 - 0.004;
-/** While another window has the focus (the lot watched on a second screen), 30 is plenty and halves the work. */
-const BACKGROUND_MIN_FRAME_S = 1 / 30 - 0.004;
 /** The resolution monitor judges 2.5 s of frames; it sits out this long after the frame cap changes. */
 const PACE_SETTLE_MS = 3000;
 const NEUTRAL_BOUNDS: [number, number] = [0, Infinity];
-const pace = { background: false, settledAt: 0 };
+/** How often the quiet-lot check runs (it walks the sessions). */
+const QUIET_CHECK_MS = 250;
+/** Frame cap in force; below 60 the resolution monitor gives no verdict (a capped frame rate is not a slow GPU). */
+const pace = { fps: ACTIVE_FPS, settledAt: 0 };
 /** How often to look for meshes whose shaders have not been compiled yet. */
 const WARMUP_CHECK_MS = 2000;
 
-/** The default view's distance to the middle of the lot: the ambience is mixed for this, louder when zoomed in. */
-const LOT_MIDDLE = new THREE.Vector3(0.2, 0.6, -0.6);
-const DEFAULT_LISTEN_DISTANCE = new THREE.Vector3(...DEFAULT_CAMERA.position).distanceTo(LOT_MIDDLE);
-
-/** Feeds the ambience mix a few times a second. */
-function SoundDirector() {
-  const acc = useRef(0);
-  const camera = useThree((s) => s.camera);
-  useFrame((_, dt) => {
-    acc.current += dt;
-    if (acc.current < 0.5) return;
-    acc.current = 0;
-    const d = envState.date;
-    // Everyone working at a laptop (subagent friends included) is typing; a session waiting on the user is not.
-    let typists = 0;
-    for (const s of Object.values(useApp.getState().sessions)) if (s.phase === "working" && !s.need) typists += 1 + Object.keys(s.subagents).length;
-    const closeness = DEFAULT_LISTEN_DISTANCE / Math.max(2, camera.position.distanceTo(LOT_MIDDLE));
-    sound.ambience(envState.lighting, d.getHours() + d.getMinutes() / 60, typists, closeness);
-  });
-  return null;
-}
-
 /**
- * Drives the render loop (the canvas runs frameloop="never"): a steady 60 fps paces evenly on 120 Hz screens, where an
- * unsteady 70–120 fps judders.
+ * Drives the render loop (the canvas runs frameloop="never"). 60 fps while the view moves (you drag, scroll, click or
+ * type, or the camera follows someone), paced evenly on 120 Hz screens where an unsteady 70–120 fps judders; 30 while
+ * you watch sessions work from a still camera; 20 when the lot is quiet; 15 with another window in front; a hidden tab
+ * gets no frames at all. Unfocused for a few seconds, it also renders light.
  */
 function FrameLimiter() {
   const advance = useThree((s) => s.advance);
+  const camera = useThree((s) => s.camera);
   useEffect(() => {
     let raf = 0;
     let last = -Infinity;
+    let quiet = false;
+    let quietAt = -Infinity;
+    let inputAt = performance.now();
+    let unfocusedSince: number | null = null;
+    const seen = { pos: camera.position.clone(), quat: camera.quaternion.clone() };
+    const touched = () => {
+      inputAt = performance.now();
+    };
+    const inputs = ["pointerdown", "pointermove", "wheel", "keydown"] as const;
+    for (const ev of inputs) window.addEventListener(ev, touched, { passive: true });
     const tick = (ms: number) => {
       raf = requestAnimationFrame(tick);
-      const background = !document.hasFocus();
-      if (background !== pace.background) {
-        pace.background = background;
+      const focused = document.hasFocus();
+      unfocusedSince = focused ? null : (unfocusedSince ?? ms);
+      if (camera.position.distanceToSquared(seen.pos) > 1e-8 || 1 - Math.abs(camera.quaternion.dot(seen.quat)) > 1e-9) {
+        seen.pos.copy(camera.position);
+        seen.quat.copy(camera.quaternion);
+        inputAt = ms;
+      }
+      if (ms - quietAt > QUIET_CHECK_MS) {
+        quietAt = ms;
+        const st = useApp.getState();
+        quiet = isQuietLot(Object.values(st.sessions), st.selectedId, serverNow());
+      }
+      const st = useApp.getState();
+      const fps = targetFps({ focused, quiet, cinematic: st.cameraMode === "cinematic", stillForMs: ms - inputAt });
+      if (fps !== pace.fps) {
+        pace.fps = fps;
         pace.settledAt = performance.now() + PACE_SETTLE_MS;
       }
+      const lite = isLite(focused, unfocusedSince === null ? 0 : ms - unfocusedSince);
+      if (lite !== st.powerSave) st.setPowerSave(lite);
       const t = ms / 1000;
-      if (t - last < (background ? BACKGROUND_MIN_FRAME_S : MIN_FRAME_S)) return;
+      if (t - last < minFrameSeconds(fps)) return;
       last = t;
       advance(t);
     };
     raf = requestAnimationFrame(tick);
-    return () => cancelAnimationFrame(raf);
-  }, [advance]);
+    return () => {
+      cancelAnimationFrame(raf);
+      for (const ev of inputs) window.removeEventListener(ev, touched);
+    };
+  }, [advance, camera]);
   return null;
 }
 
@@ -98,10 +105,12 @@ function FrameLimiter() {
 function AdaptiveResolution() {
   const setDpr = useThree((s) => s.setDpr);
   const compact = useApp((s) => s.compact);
+  const powerSave = useApp((s) => s.powerSave);
   const level = useRef<number>(DPR_STEPS.length - 1);
-  // Compact mode (a second monitor) caps the resolution whatever the monitor's verdict is.
-  const apply = (i: number) => setDpr(compact ? Math.min(COMPACT_DPR, DPR_STEPS[i]!) : DPR_STEPS[i]!);
-  useEffect(() => apply(level.current), [compact]);
+  // Compact mode (a second monitor) and power saving (window in the background) cap the resolution whatever the
+  // monitor's verdict is.
+  const apply = (i: number) => setDpr(compact || powerSave ? Math.min(COMPACT_DPR, DPR_STEPS[i]!) : DPR_STEPS[i]!);
+  useEffect(() => apply(level.current), [compact, powerSave]);
   const to = (i: number) => {
     if (i === level.current) return;
     level.current = i;
@@ -112,7 +121,7 @@ function AdaptiveResolution() {
       factor={1}
       flipflops={4}
       // A capped frame rate is not a slow GPU: no verdict while capped or just after.
-      bounds={() => (pace.background || performance.now() < pace.settledAt ? NEUTRAL_BOUNDS : [45, 58])}
+      bounds={() => (pace.fps < ACTIVE_FPS || performance.now() < pace.settledAt ? NEUTRAL_BOUNDS : [45, 58])}
       onChange={({ factor }) => to(Math.round(factor * (DPR_STEPS.length - 1)))}
       onFallback={() => to(0)}
     />
@@ -163,6 +172,7 @@ function ShaderWarmup() {
 export function Scene() {
   const cam = cameraFromUrl() ?? DEFAULT_CAMERA;
   const compact = useApp((s) => s.compact);
+  const powerSave = useApp((s) => s.powerSave);
   return (
     <Canvas
       className="scene"
@@ -245,9 +255,8 @@ export function Scene() {
           <Ready part="characters" />
         </Suspense>
       </AssetBoundary>
-      <Post compact={compact} />
+      <Post compact={compact} lite={powerSave} />
       <CameraRig position={cam.position} target={cam.target} />
-      <SoundDirector />
       {SHOW_STATS && <Stats />}
     </Canvas>
   );

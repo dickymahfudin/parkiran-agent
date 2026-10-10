@@ -1,8 +1,7 @@
 // Life around the lot that does not depend on sessions: passing cars, a sleeping cat, falling leaves.
-import { useFrame, useThree } from "@react-three/fiber";
+import { useFrame } from "@react-three/fiber";
 import { Suspense, useEffect, useMemo, useRef } from "react";
 import * as THREE from "three";
-import { sound, type VehicleKind } from "../../audio/sound.ts";
 import { lookFor, rng } from "../characters/identity.ts";
 import { disposeSkinned } from "../characters/dispose.ts";
 import { attach, buildRig, useCharacterAsset } from "../characters/characterAsset.ts";
@@ -34,26 +33,6 @@ function poolTexture(): THREE.CanvasTexture {
   });
 }
 
-const SPEED_OF_SOUND = 343;
-/** Distance (m) at which an engine has dropped to half its loudness. */
-const ENGINE_HALF_DISTANCE = 7;
-const listener = { right: new THREE.Vector3(), rel: new THREE.Vector3() };
-
-/** Loudness, stereo position and Doppler pitch of a vehicle's engine as heard from the camera. */
-function engineSound(key: string, kind: VehicleKind, m: Vehicle, x: number, camera: THREE.Camera): void {
-  if (!m.active) {
-    sound.vehicle(key, kind, 0, 0, 1);
-    return;
-  }
-  const rel = listener.rel.set(x - camera.position.x, 0.5 - camera.position.y, m.z - camera.position.z);
-  const d = Math.max(rel.length(), 0.5);
-  const right = listener.right.setFromMatrixColumn(camera.matrixWorld, 0);
-  const pan = (rel.dot(right) / d) * 1.3;
-  const away = (LANES[m.lane].dir * m.speed * rel.z) / d;
-  const loudness = 1 / (1 + (d / ENGINE_HALF_DISTANCE) ** 2);
-  sound.vehicle(key, kind, loudness, pan, (SPEED_OF_SOUND / (SPEED_OF_SOUND + away)) * (0.9 + (m.speed - 6) * 0.04));
-}
-
 /** A few cars cruising past on the street at kampung speed, headlights on after dusk. */
 function Traffic({ cars }: { cars: readonly Vehicle[] }) {
   const refs = useRef<(THREE.Group | null)[]>([]);
@@ -70,11 +49,9 @@ function Traffic({ cars }: { cars: readonly Vehicle[] }) {
     () => new THREE.MeshBasicMaterial({ map: poolTexture(), transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, opacity: 0 }),
     [],
   );
-  const camera = useThree((s) => s.camera);
 
   useFrame(() => {
     const night = envState.lighting.lamps;
-    cars.forEach((m, i) => engineSound(`car-${i}`, "car", m, LANES[m.lane].x, camera));
     cars.forEach((m, i) => {
       const g = refs.current[i];
       const pool = pools.current[i];
@@ -183,11 +160,9 @@ function ScooterTraffic({ scooters }: { scooters: readonly Vehicle[] }) {
     () => new THREE.MeshBasicMaterial({ map: poolTexture(), transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, opacity: 0 }),
     [],
   );
-  const camera = useThree((s) => s.camera);
 
   useFrame(() => {
     const night = envState.lighting.lamps;
-    scooters.forEach((m, i) => engineSound(`scooter-${i}`, "scooter", m, laneX(m.lane, "scooter"), camera));
     poolMat.opacity = night * 0.4;
     scooters.forEach((m, i) => {
       const g = refs.current[i];

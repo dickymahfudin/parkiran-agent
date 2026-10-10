@@ -25,33 +25,7 @@ function useFirstClick(): void {
   }, []);
   const audioEnabled = useApp((s) => s.audioEnabled);
   const audioUnlocked = useApp((s) => s.audioUnlocked);
-  const ambienceEnabled = useApp((s) => s.ambienceEnabled);
   useEffect(() => sound.setEnabled(audioEnabled && audioUnlocked), [audioEnabled, audioUnlocked]);
-  useEffect(() => sound.setAmbience(ambienceEnabled), [ambienceEnabled]);
-  // Watching from another window: the street and the keyboards drop to a murmur, the chime and the "ting" do not.
-  // Coming back also wakes a context the browser suspended meanwhile.
-  useEffect(() => {
-    const update = () => {
-      const away = document.hidden || !document.hasFocus();
-      sound.setDucked(away);
-      if (!document.hidden) sound.resume();
-    };
-    update();
-    for (const ev of ["visibilitychange", "focus", "blur"]) window.addEventListener(ev, update);
-    return () => {
-      for (const ev of ["visibilitychange", "focus", "blur"]) window.removeEventListener(ev, update);
-    };
-  }, []);
-  // Some browsers only resume audio inside a user gesture: every click or key gets the chance (cheap while running).
-  useEffect(() => {
-    const wake = () => sound.resume();
-    window.addEventListener("pointerdown", wake);
-    window.addEventListener("keydown", wake);
-    return () => {
-      window.removeEventListener("pointerdown", wake);
-      window.removeEventListener("keydown", wake);
-    };
-  }, []);
 }
 
 export function App() {

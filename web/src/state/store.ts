@@ -87,12 +87,13 @@ interface AppState {
   compact: boolean;
   /** User preference; sound only plays once the page has had a click (browser autoplay rule). */
   audioEnabled: boolean;
-  /** The continuous layers (street, keyboards, crickets, engines); the cues play whenever sound is on. */
-  ambienceEnabled: boolean;
   audioUnlocked: boolean;
   notificationsEnabled: boolean;
   /** The session list folded down to its header and summary (remembered in this browser). */
   sessionsCollapsed: boolean;
+  /** Rendering light because the window is in the background (set by the frame limiter, not stored). */
+  powerSave: boolean;
+  setPowerSave(on: boolean): void;
   /** The event feed folded to its header (per browser). */
   eventsCollapsed: boolean;
   /** Needs the user has seen (clicked the character): session id → need.since. Stops the repeating sound only. */
@@ -109,7 +110,6 @@ interface AppState {
   resetView(): void;
   setCompact(on: boolean): void;
   setAudioEnabled(on: boolean): void;
-  setAmbienceEnabled(on: boolean): void;
   unlockAudio(): void;
   setNotificationsEnabled(on: boolean): void;
   setSessionsCollapsed(on: boolean): void;
@@ -136,12 +136,13 @@ export const useApp = create<AppState>((set) => ({
   viewResets: 0,
   compact: params.has("compact"),
   audioEnabled: pref("audio", true),
-  ambienceEnabled: pref("ambience", true),
   audioUnlocked: false,
   // On by default (user's choice): the browser's permission prompt comes with the first click on the page.
   notificationsEnabled: pref("notifications", true),
   sessionsCollapsed: pref("sessionsCollapsed", false),
   eventsCollapsed: pref("eventsCollapsed", false),
+  powerSave: false,
+  setPowerSave: (powerSave) => set({ powerSave }),
   acknowledged: {},
 
   setTimeOverride: (timeOverride) => set({ timeOverride }),
@@ -209,10 +210,6 @@ export const useApp = create<AppState>((set) => ({
   setAudioEnabled: (audioEnabled) => {
     savePref("audio", audioEnabled);
     set({ audioEnabled });
-  },
-  setAmbienceEnabled: (ambienceEnabled) => {
-    savePref("ambience", ambienceEnabled);
-    set({ ambienceEnabled });
   },
   unlockAudio: () => set({ audioUnlocked: true }),
   setNotificationsEnabled: (notificationsEnabled) => {
