@@ -1,5 +1,6 @@
 // How often the scene renders, and when it renders light. Pure, unit tested; Scene.tsx's FrameLimiter applies it.
 import type { PublicSession } from "../../../shared/src/protocol.ts";
+import type { PowerMode } from "../state/settings.ts";
 
 /** You are moving the camera (drag, scroll, click, keys) or it is moving by itself (following someone, cinematic). */
 export const ACTIVE_FPS = 60;
@@ -24,15 +25,24 @@ export interface PaceInput {
   stillForMs: number;
 }
 
+/** Frame rates per battery setting. Saver is the default (20 at most); Balanced was measured; Smooth never drops low. */
+export const RATES: Readonly<Record<PowerMode, { active: number; watch: number; quiet: number; background: number }>> = {
+  // The default (user's choice): never above 20, even while the camera moves.
+  saver: { active: 20, watch: 20, quiet: 15, background: 10 },
+  balanced: { active: ACTIVE_FPS, watch: WATCH_FPS, quiet: QUIET_FPS, background: BACKGROUND_FPS },
+  smooth: { active: 60, watch: 60, quiet: 30, background: 30 },
+};
+
 /**
- * 60 only while the view moves: that is where a lower rate shows (a panning camera judders at 30). Watching sessions
- * work from a still camera is 30, a quiet lot 20, another window in front 15.
+ * The full rate only while the view moves: that is where a lower rate shows (a panning camera judders at 30). Watching
+ * sessions work from a still camera is lower, a quiet lot lower still, another window in front the lowest.
  */
-export function targetFps(p: PaceInput): number {
-  if (!p.focused) return BACKGROUND_FPS;
-  if (p.stillForMs < STILL_AFTER_MS) return ACTIVE_FPS;
-  if (p.quiet && !p.cinematic) return QUIET_FPS;
-  return WATCH_FPS;
+export function targetFps(p: PaceInput, mode: PowerMode = "balanced"): number {
+  const r = RATES[mode];
+  if (!p.focused) return r.background;
+  if (p.stillForMs < STILL_AFTER_MS) return r.active;
+  if (p.quiet && !p.cinematic) return r.quiet;
+  return r.watch;
 }
 
 /** Shortest time between two frames at `fps`, with a few ms of vsync jitter allowed. */
@@ -51,7 +61,12 @@ export function isQuietLot(sessions: readonly Quietness[], selectedId: string | 
   return sessions.every((s) => s.phase === "idle" && s.need === null && Object.keys(s.subagents).length === 0 && now - s.lastEventAt >= SETTLE_MS);
 }
 
-/** Render light once the window has been in the background for a while; at once back to full when it returns. */
-export function isLite(focused: boolean, unfocusedForMs: number): boolean {
+/**
+ * Light rendering (resolution 1, no ambient occlusion): always on Saver, never on Smooth, and on Balanced once the
+ * window has been in the background for a while (at once back to full when it returns).
+ */
+export function isLite(focused: boolean, unfocusedForMs: number, mode: PowerMode = "balanced"): boolean {
+  if (mode === "saver") return true;
+  if (mode === "smooth") return false;
   return !focused && unfocusedForMs >= LITE_AFTER_MS;
 }

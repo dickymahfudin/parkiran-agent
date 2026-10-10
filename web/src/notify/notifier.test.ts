@@ -73,4 +73,30 @@ describe("createNotifier", () => {
     h.notifier.stop();
     expect(h.shown[1]!.closed).toBe(true);
   });
+
+  test("quiet hours: no chime, but the system notification still comes", () => {
+    let chimes = 0;
+    const shown: string[] = [];
+    const n = createNotifier({
+      chime: () => chimes++,
+      notify: (x) => {
+        shown.push(x.id);
+        return { close: () => undefined };
+      },
+    });
+    const sessions = { a: session("a", 1000) };
+    n.tick({ sessions, acknowledged: {}, clockOffset: 0, notificationsEnabled: true, quiet: true }, 1000);
+    n.tick({ sessions, acknowledged: {}, clockOffset: 0, notificationsEnabled: true, quiet: true }, 1000 + CHIME_EVERY_MS);
+    expect(chimes).toBe(0);
+    expect(shown).toEqual(["a"]);
+  });
+
+  test("chime once: a single chime per need", () => {
+    let chimes = 0;
+    const n = createNotifier({ chime: () => chimes++, notify: () => null });
+    const sessions = { a: session("a", 1000) };
+    for (let t = 1000; t < 1000 + 5 * CHIME_EVERY_MS; t += 1000)
+      n.tick({ sessions, acknowledged: {}, clockOffset: 0, notificationsEnabled: false, chimeEveryMs: null }, t);
+    expect(chimes).toBe(1);
+  });
 });

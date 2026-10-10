@@ -4,6 +4,7 @@ import * as THREE from "three";
 import type { PublicSession } from "../../../../shared/src/protocol.ts";
 import { SEATS } from "../../../../shared/src/seats.ts";
 import { MOOD_COLOR, sessionName, stateLabel } from "../../hud/labels.ts";
+import type { HabitMix } from "../../state/settings.ts";
 import { serverNow, useApp } from "../../state/store.ts";
 import {
   SEAT_PLACES,
@@ -16,20 +17,27 @@ import {
   type Vec2,
 } from "../layout.ts";
 import { Brain, type Home, type Target } from "./brain.ts";
-import { hash32, lookFor, type Look } from "./identity.ts";
+import { brainInPlace, habitFor, habitRebuilds } from "./habits.ts";
+import { hash32, lookFor, type Habit, type Look } from "./identity.ts";
 import { PakJoko, warungCounter } from "./PakJoko.tsx";
-import { Person, type TagInfo } from "./Person.tsx";
+import { Person } from "./Person.tsx";
 import { SmokeSystem, type SmokeSource } from "./props.tsx";
+import { trimTag, type TagInfo } from "./tags.ts";
 
 interface Entry {
   key: string;
   sessionId: string;
   agentId: string | null;
   brain: Brain;
+  /** `look.habit` is the habit the brain was built with: `seeded` under the habits setting. */
   look: Look;
+  seeded: Habit;
+  home: Home;
   homeKey: string;
   smoke: SmokeSource;
   steam: SmokeSource;
+  /** Bumped when the person is rebuilt for a new habit: a new key remounts the character. */
+  gen: number;
 }
 
 const NEIGHBOURS = new Map(SEATS.map((s) => [s.id, s.neighbours]));
@@ -88,6 +96,22 @@ function standingPlaces(sessions: readonly PublicSession[]): Map<string, Standin
 }
 
 const friendKey = (sessionId: string, agentId: string): string => `${sessionId}/${agentId}`;
+
+const newSource = (kind: "smoke" | "steam"): SmokeSource => ({ active: false, world: new THREE.Vector3(), kind });
+
+/**
+ * The same person with another habit (the habits setting changed), rebuilt in place (`brainInPlace`), with fresh smoke
+ * sources so nothing of the old habit lingers.
+ */
+function rebuild(e: Entry, habit: Habit, visit: Home | null, now: number): void {
+  const target = e.brain.state.target;
+  if (target === null) throw new Error(`rebuild of ${e.key} before it had a target`);
+  e.brain = brainInPlace({ seed: e.look.seed, home: e.home, target, habit, visit, now });
+  e.look = { ...e.look, habit };
+  e.smoke = newSource("smoke");
+  e.steam = newSource("steam");
+  e.gen++;
+}
 
 function tagFor(s: PublicSession, now: number, twins: ReadonlyMap<string, number>): TagInfo {
   const label = stateLabel(s, now);
@@ -210,7 +234,10 @@ export function Characters() {
   const lastCueSeq = useRef(0);
   const synced = useRef<{ sessions: unknown; cueSeq: number; at: number } | null>(null);
   const visits = useRef(new Map<string, string>());
+  /** The habits setting the cast was built with. */
+  const mix = useRef<HabitMix>(useApp.getState().settings.habits);
   const sessions = useApp((st) => st.sessions);
+  const nameTags = useApp((st) => st.settings.nameTags);
   const twins = useApp((st) => st.twins);
   const select = useApp((st) => st.select);
 
@@ -230,6 +257,23 @@ export function Characters() {
       changed = true;
     }
     warungCounter.busy = buying;
+    if (st.settings.habits !== mix.current) {
+      mix.current = st.settings.habits;
+      const cast = [...entries.current.values()].map((e) => ({
+        key: e.key,
+        seeded: e.seeded,
+        habit: e.look.habit,
+        leaving: e.brain.done || e.brain.state.target === null || e.brain.state.target.kind === "gone",
+      }));
+      for (const key of habitRebuilds(cast, mix.current)) {
+        const e = entries.current.get(key)!;
+        const stool = visits.current.get(key);
+        rebuild(e, habitFor(e.seeded, mix.current), stool ? (WARUNG_PLACES.get(stool) ?? null) : null, serverNow());
+        smokeSources.set(`${key}:smoke`, e.smoke);
+        smokeSources.set(`${key}:steam`, e.steam);
+        changed = true;
+      }
+    }
     const seated = (): Map<string, Entry> => new Map([...entries.current.values()].filter((e) => SEAT_PLACES[e.homeKey]).map((e) => [e.homeKey, e]));
     if (arrivals.length > 0) {
       const bySeat = seated();
@@ -246,18 +290,22 @@ export function Characters() {
     const ensure = (key: string, sessionId: string, agentId: string | null, home: { home: Home; key: string }, target: Target): Entry => {
       let e = entries.current.get(key);
       if (!e) {
-        const look = lookFor(agentId ?? sessionId);
+        const own = lookFor(agentId ?? sessionId);
+        const look: Look = { ...own, habit: habitFor(own.habit, mix.current) };
         const atHome = initialKeys.current!.has(key) && (agentId === null || target.kind !== "gone");
-        const smoke: SmokeSource = { active: false, world: new THREE.Vector3(), kind: "smoke" };
-        const steam: SmokeSource = { active: false, world: new THREE.Vector3(), kind: "steam" };
+        const smoke = newSource("smoke");
+        const steam = newSource("steam");
         e = {
           key,
           sessionId,
           agentId,
           look,
+          seeded: own.habit,
+          home: home.home,
           homeKey: home.key,
           smoke,
           steam,
+          gen: 0,
           brain: new Brain({ seed: look.seed, home: home.home, atHome, target, habit: look.habit }),
         };
         entries.current.set(key, e);
@@ -266,6 +314,7 @@ export function Characters() {
         changed = true;
       } else if (e.homeKey !== home.key) {
         e.homeKey = home.key;
+        e.home = home.home;
         e.brain.setHome(home.home);
       }
       wanted.add(key);
@@ -315,21 +364,23 @@ export function Characters() {
   return (
     <>
       {keys.map((key) => {
+        // The need bubble, the Zzz and the done badge are not part of the tag: they show whatever the name-tags setting.
         const e = entries.current.get(key);
         if (!e) return null;
         const s = sessions[e.sessionId];
         const sub = e.agentId && s ? s.subagents[e.agentId] : undefined;
-        const tag: TagInfo | null = s
-          ? e.agentId
-            ? { title: sub?.type || "subagent", subtitle: null, color: "#c9d1d9", text: "helping", icon: null }
-            : tagFor(s, now, twins)
-          : null;
+        const full: TagInfo | null =
+          nameTags === "off" || !s
+            ? null
+            : e.agentId
+              ? { title: sub?.type || "subagent", subtitle: null, color: "#c9d1d9", text: "helping", icon: null }
+              : tagFor(s, now, twins);
         return (
           <Person
-            key={key}
+            key={`${key}#${e.gen}`}
             brain={e.brain}
             look={e.look}
-            tag={tag}
+            tag={trimTag(full, nameTags)}
             friend={e.agentId !== null}
             smoke={e.smoke}
             steam={e.steam}

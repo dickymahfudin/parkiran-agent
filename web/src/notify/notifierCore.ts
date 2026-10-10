@@ -1,6 +1,6 @@
 // The notifier's bookkeeping, free of DOM types so it can be unit tested under Bun.
 import type { PublicSession } from "../../../shared/src/protocol.ts";
-import { shouldChime, shouldNotify } from "./rules.ts";
+import { CHIME_EVERY_MS, shouldChime, shouldNotify } from "./rules.ts";
 
 /** What the notifier needs from the outside, injectable so the bookkeeping can be unit tested. */
 export interface NotifierDeps {
@@ -14,6 +14,10 @@ export interface NotifierInput {
   acknowledged: Readonly<Record<string, number>>;
   clockOffset: number;
   notificationsEnabled: boolean;
+  /** Between chime beats for one waiting session; null: once (default 25 s). */
+  chimeEveryMs?: number | null;
+  /** Quiet hours: the beats go on (and bring the system notification) but make no sound. */
+  quiet?: boolean;
 }
 
 /**
@@ -44,9 +48,10 @@ export function createNotifier(deps: NotifierDeps) {
           dismiss(s.id);
           continue;
         }
-        if (!shouldChime(s, input.acknowledged[s.id], lastChime.get(s.id), now + input.clockOffset)) continue;
+        const every = input.chimeEveryMs === undefined ? CHIME_EVERY_MS : input.chimeEveryMs;
+        if (!shouldChime(s, input.acknowledged[s.id], lastChime.get(s.id), now + input.clockOffset, every)) continue;
         lastChime.set(s.id, now + input.clockOffset);
-        deps.chime();
+        if (!input.quiet) deps.chime();
         if (input.notificationsEnabled && shouldNotify(lastNotified.get(s.id), now)) {
           lastNotified.set(s.id, now);
           const handle = deps.notify(s);

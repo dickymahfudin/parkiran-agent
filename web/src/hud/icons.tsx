@@ -21,6 +21,7 @@ import {
   Minimize2,
   Moon,
   RotateCcw,
+  Settings2,
   Sun,
   Sunrise,
   Sunset,
@@ -68,6 +69,7 @@ const ICONS: Record<IconName, LucideIcon> = {
   collapse: ChevronUp,
   expandList: ChevronDown,
   close: X,
+  settings: Settings2,
 };
 
 /** A stroke icon sized by the surrounding font, in the text colour. */

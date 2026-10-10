@@ -28,4 +28,13 @@ describe("notifier", () => {
     const later = { ...base, need: { ...base.need!, since: 50_000 } };
     expect(shouldChime(later, 1000, 40_000, 50_100)).toBe(true);
   });
+
+  test("the repeat can be slower, or once only", () => {
+    expect(shouldChime(base, undefined, 1500, 1500 + 59_999, 60_000)).toBe(false);
+    expect(shouldChime(base, undefined, 1500, 1500 + 60_000, 60_000)).toBe(true);
+    expect(shouldChime(base, undefined, undefined, 1500, null)).toBe(true);
+    expect(shouldChime(base, undefined, 1500, 9_999_999, null)).toBe(false);
+    // A new need from the same session rings again, even on "once".
+    expect(shouldChime({ ...base, need: { ...base.need!, since: 5000 } }, undefined, 1500, 5001, null)).toBe(true);
+  });
 });

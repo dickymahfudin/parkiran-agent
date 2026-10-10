@@ -37,7 +37,8 @@ export type IconName =
   | "milestone"
   | "collapse"
   | "expandList"
-  | "close";
+  | "close"
+  | "settings";
 
 export interface StateLabel {
   text: string;

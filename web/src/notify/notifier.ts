@@ -3,6 +3,7 @@
 import type { PublicSession } from "../../../shared/src/protocol.ts";
 import { sound } from "../audio/sound.ts";
 import { sessionName } from "../hud/labels.ts";
+import { chimeEveryMs, inQuietHours } from "../state/settings.ts";
 import { useApp } from "../state/store.ts";
 import { createNotifier } from "./notifierCore.ts";
 import { notificationTitle } from "./rules.ts";
@@ -31,7 +32,14 @@ export function startNotifier(): () => void {
   const timer = setInterval(() => {
     const st = useApp.getState();
     notifier.tick(
-      { sessions: st.sessions, acknowledged: st.acknowledged, clockOffset: st.clockOffset, notificationsEnabled: st.notificationsEnabled },
+      {
+        sessions: st.sessions,
+        acknowledged: st.acknowledged,
+        clockOffset: st.clockOffset,
+        notificationsEnabled: st.notificationsEnabled,
+        chimeEveryMs: chimeEveryMs(st.settings.chimeRepeat),
+        quiet: inQuietHours(new Date(), st.settings.quietHours),
+      },
       Date.now(),
     );
   }, 1000);

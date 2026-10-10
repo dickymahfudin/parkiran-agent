@@ -26,6 +26,10 @@ function useFirstClick(): void {
   const audioEnabled = useApp((s) => s.audioEnabled);
   const audioUnlocked = useApp((s) => s.audioUnlocked);
   useEffect(() => sound.setEnabled(audioEnabled && audioUnlocked), [audioEnabled, audioUnlocked]);
+  const cues = useApp((s) => s.settings.cues);
+  useEffect(() => sound.setCues(cues), [cues]);
+  const volume = useApp((s) => s.settings.volume);
+  useEffect(() => sound.setVolume(volume), [volume]);
 }
 
 export function App() {

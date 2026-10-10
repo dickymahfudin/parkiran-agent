@@ -80,12 +80,13 @@ function FrameLimiter() {
         quiet = isQuietLot(Object.values(st.sessions), st.selectedId, serverNow());
       }
       const st = useApp.getState();
-      const fps = targetFps({ focused, quiet, cinematic: st.cameraMode === "cinematic", stillForMs: ms - inputAt });
+      const mode = st.settings.power;
+      const fps = targetFps({ focused, quiet, cinematic: st.cameraMode === "cinematic", stillForMs: ms - inputAt }, mode);
       if (fps !== pace.fps) {
         pace.fps = fps;
         pace.settledAt = performance.now() + PACE_SETTLE_MS;
       }
-      const lite = isLite(focused, unfocusedSince === null ? 0 : ms - unfocusedSince);
+      const lite = isLite(focused, unfocusedSince === null ? 0 : ms - unfocusedSince, mode);
       if (lite !== st.powerSave) st.setPowerSave(lite);
       const t = ms / 1000;
       if (t - last < minFrameSeconds(fps)) return;
@@ -121,6 +122,7 @@ function AdaptiveResolution() {
       factor={1}
       flipflops={4}
       // A capped frame rate is not a slow GPU: no verdict while capped or just after.
+      // Judged only at the full 60: below it the frame rate is our cap, not a slow GPU.
       bounds={() => (pace.fps < ACTIVE_FPS || performance.now() < pace.settledAt ? NEUTRAL_BOUNDS : [45, 58])}
       onChange={({ factor }) => to(Math.round(factor * (DPR_STEPS.length - 1)))}
       onFallback={() => to(0)}

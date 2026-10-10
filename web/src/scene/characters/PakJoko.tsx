@@ -1,8 +1,10 @@
 // Pak Joko, the warung owner, behind his counter (see warungOwner.ts), and the little stool he naps on.
 import { useFrame } from "@react-three/fiber";
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import * as THREE from "three";
+import { useApp } from "../../state/store.ts";
 import { envState } from "../env/envState.ts";
+import { habitFor } from "./habits.ts";
 import { lookFor, type Look } from "./identity.ts";
 import { Person } from "./Person.tsx";
 import type { SmokeSource } from "./props.tsx";
@@ -22,6 +24,7 @@ const LOOK: Look = {
   hairColor: "#2e2219",
   cap: null,
   accessory: "peci",
+  // His own habit; the viewer's habits setting goes on top (`habitFor`).
   habit: "kretek",
   scale: 1,
 };
@@ -47,9 +50,16 @@ function Stool() {
 }
 
 export function PakJoko({ smoke, steam }: { smoke: SmokeSource; steam: SmokeSource }) {
-  const owner = useMemo(() => new WarungOwner(LOOK.seed), []);
+  const habit = habitFor(
+    LOOK.habit,
+    useApp((st) => st.settings.habits),
+  );
+  // Built once with the habit of the moment; a later change goes through setHabit, so his routine carries on.
+  const [owner] = useState(() => new WarungOwner(LOOK.seed, habit));
+  const look = useMemo<Look>(() => ({ ...LOOK, habit }), [habit]);
   useFrame(() => {
     const d = envState.date;
+    owner.setHabit(habit);
     owner.setNight(isOwnerNight(d.getHours() + d.getMinutes() / 60));
     owner.setServing(warungCounter.busy);
   }, -1);
@@ -57,7 +67,8 @@ export function PakJoko({ smoke, steam }: { smoke: SmokeSource; steam: SmokeSour
   return (
     <>
       <Stool />
-      <Person brain={animator} look={LOOK} tag={null} friend={false} smoke={smoke} steam={steam} />
+      {/* A new habit is a new set of props in his hands: the character is remounted (same spot, same routine). */}
+      <Person key={habit} brain={animator} look={look} tag={null} friend={false} smoke={smoke} steam={steam} />
     </>
   );
 }

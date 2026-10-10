@@ -1,5 +1,6 @@
 // Where the traces by a seat go and how many there are. Pure, unit tested; drawn by Traces.tsx.
 import type { PublicSession } from "../../../../shared/src/protocol.ts";
+import type { HabitMix } from "../../state/settings.ts";
 import { BENCH_Y, SEAT_PLACES } from "../layout.ts";
 
 /** One butt per this much time in the lot. */
@@ -26,10 +27,22 @@ export function traceSpot(seatId: string): TraceSpot | null {
   return { at: [x + 0.62, 0, z + 0.38], along: [1, 0] };
 }
 
-/** How many butts and empty glasses a session has left by its seat. */
-export function traceCounts(s: Pick<PublicSession, "startedAt" | "compactions">, now: number): { butts: number; cups: number } {
+export interface TraceCounts {
+  /** The tin ashtray: only while kretek smokers are about (the habits setting's usual mix). */
+  tray: boolean;
+  butts: number;
+  cups: number;
+}
+
+/**
+ * What a session has left by its seat. With no smoking or vapes only nobody makes butts: no ashtray, no butts; the
+ * empty kopi glasses after compactions stay.
+ */
+export function traceCounts(s: Pick<PublicSession, "startedAt" | "compactions">, now: number, habits: HabitMix = "mixed"): TraceCounts {
+  const tray = habits === "mixed";
   return {
-    butts: Math.min(MAX_BUTTS, Math.floor(Math.max(0, now - s.startedAt) / BUTT_EVERY_MS)),
+    tray,
+    butts: tray ? Math.min(MAX_BUTTS, Math.floor(Math.max(0, now - s.startedAt) / BUTT_EVERY_MS)) : 0,
     cups: Math.min(MAX_CUPS, s.compactions),
   };
 }

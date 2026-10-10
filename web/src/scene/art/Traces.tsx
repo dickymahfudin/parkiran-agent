@@ -1,5 +1,6 @@
-// Traces of time by each seat: a tin ashtray that fills with butts as the session ages, and an empty kopi glass for
-// every compaction. Read the age of a session from the scene alone. Three instanced draws for the whole lot.
+// Traces of time by each seat: a tin ashtray that fills with butts as the session ages (only in the habits setting's
+// usual mix: nobody makes butts otherwise), and an empty kopi glass for every compaction. Read the age of a session
+// from the scene alone. Three instanced draws for the whole lot.
 import { useFrame } from "@react-three/fiber";
 import { useMemo, useRef } from "react";
 import * as THREE from "three";
@@ -20,7 +21,7 @@ export function Traces() {
   const trays = useRef<THREE.InstancedMesh>(null!);
   const butts = useRef<THREE.InstancedMesh>(null!);
   const cups = useRef<THREE.InstancedMesh>(null!);
-  const last = useRef<{ at: number; sessions: unknown }>({ at: -Infinity, sessions: null });
+  const last = useRef<{ at: number; sessions: unknown; habits: unknown }>({ at: -Infinity, sessions: null, habits: null });
   const m = useMemo(
     () => ({ mat: new THREE.Matrix4(), q: new THREE.Quaternion(), e: new THREE.Euler(), p: new THREE.Vector3(), s: new THREE.Vector3(1, 1, 1) }),
     [],
@@ -29,20 +30,25 @@ export function Traces() {
   useFrame(() => {
     const st = useApp.getState();
     const wall = performance.now();
-    if (st.sessions === last.current.sessions && wall - last.current.at < REFRESH_MS) return;
-    last.current = { at: wall, sessions: st.sessions };
+    const habits = st.settings.habits;
+    if (st.sessions === last.current.sessions && habits === last.current.habits && wall - last.current.at < REFRESH_MS) return;
+    last.current = { at: wall, sessions: st.sessions, habits };
     const now = serverNow();
+    let seats = 0;
     let tray = 0;
     let butt = 0;
     let cup = 0;
     for (const s of Object.values(st.sessions)) {
       const spot = s.seat ? traceSpot(s.seat) : null;
-      if (!spot || tray >= MAX_SEATS) continue;
+      if (!spot || seats >= MAX_SEATS) continue;
+      seats++;
       const [x, y, z] = spot.at;
       const r = rng(hash32(s.id));
-      m.mat.compose(m.p.set(x, y + 0.012, z), m.q.identity(), m.s.set(1, 1, 1));
-      trays.current.setMatrixAt(tray++, m.mat);
-      const { butts: nb, cups: nc } = traceCounts(s, now);
+      const { tray: hasTray, butts: nb, cups: nc } = traceCounts(s, now, habits);
+      if (hasTray) {
+        m.mat.compose(m.p.set(x, y + 0.012, z), m.q.identity(), m.s.set(1, 1, 1));
+        trays.current.setMatrixAt(tray++, m.mat);
+      }
       for (let i = 0; i < nb; i++) {
         // Stubbed out in the tray, the odd one next to it.
         const out = i % 4 === 3;

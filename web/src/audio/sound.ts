@@ -4,6 +4,7 @@
 // daemon idles and the machine may sleep; a cue wakes it (a few ms) and it sleeps again two seconds after the last one.
 // Nothing plays until the page has been clicked (browser autoplay policy).
 // Laptop speakers reproduce almost nothing below ~200 Hz, so every cue has its body in the 300 Hz – 5 kHz band.
+import { DEFAULT_SETTINGS, type SoundCue } from "../state/settings.ts";
 import { createWake } from "./wake.ts";
 
 const MASTER = 0.7;
@@ -22,6 +23,9 @@ class SoundEngine {
   private bus: GainNode | null = null;
   private noise: AudioBuffer | null = null;
   private enabled = false;
+  private volume = 1;
+  /** Single sounds turned off in the settings panel (the master switch is `enabled`). */
+  private cues: Record<SoundCue, boolean> = { ...DEFAULT_SETTINGS.cues };
   private readonly wake = createWake({
     now: () => performance.now(),
     setTimer: (fn, ms) => setTimeout(fn, ms),
@@ -38,7 +42,7 @@ class SoundEngine {
     const ctx = new AudioContext();
     this.ctx = ctx;
     this.master = ctx.createGain();
-    this.master.gain.value = this.enabled ? MASTER : 0;
+    this.master.gain.value = this.enabled ? MASTER * this.volume : 0;
     const comp = ctx.createDynamicsCompressor();
     comp.threshold.value = -20;
     comp.knee.value = 12;
@@ -54,10 +58,25 @@ class SoundEngine {
 
   setEnabled(on: boolean): void {
     this.enabled = on;
-    if (this.master && this.ctx) this.master.gain.setTargetAtTime(on ? MASTER : 0, this.ctx.currentTime, 0.2);
+    if (this.master && this.ctx) this.master.gain.setTargetAtTime(on ? MASTER * this.volume : 0, this.ctx.currentTime, 0.2);
     if (!on) this.wake.release();
     // Awake for whatever reason (just unlocked, woken by the browser): make sure it goes back to sleep.
     else if (this.ctx?.state === "running") this.wake.hold(0);
+  }
+
+  /** 0…1 from the settings panel's slider, on top of the on/off switch. */
+  setVolume(volume: number): void {
+    this.volume = Math.min(1, Math.max(0, volume));
+    if (this.master && this.ctx && this.enabled) this.master.gain.setTargetAtTime(MASTER * this.volume, this.ctx.currentTime, 0.05);
+  }
+
+  /** The chime at the current volume, for the slider: plays even when the chime cue itself is switched off. */
+  preview(): void {
+    if (this.bus) this.ringChime();
+  }
+
+  setCues(cues: Record<SoundCue, boolean>): void {
+    this.cues = { ...cues };
   }
 
   /** For the dev console and checks. */
@@ -87,7 +106,10 @@ class SoundEngine {
 
   /** Two-tone "ting-tung" for a session that needs you. */
   chime(): void {
-    if (!this.bus) return;
+    if (this.bus && this.cues.needsYou) this.ringChime();
+  }
+
+  private ringChime(): void {
     this.play(1.2, (ctx) => {
       for (const [freq, at] of [
         [880, 0],
@@ -109,7 +131,7 @@ class SoundEngine {
 
   /** A soft single "ting" when a session finishes its turn: quieter and shorter than the needs-you chime. */
   done(): void {
-    if (!this.bus) return;
+    if (!this.bus || !this.cues.turnDone) return;
     this.play(1.2, (ctx) => {
       const t = ctx.currentTime;
       for (const [freq, peak] of [
@@ -134,7 +156,7 @@ class SoundEngine {
    * `loudness` 0…1 from the distance, `pan` −1 (left) … 1 (right).
    */
   cartCall(kind: "bakso" | "nasgor", loudness: number, pan: number): void {
-    if (!this.noise || !this.bus || loudness < 0.02) return;
+    if (!this.noise || !this.bus || !this.cues.cart || loudness < 0.02) return;
     this.play(1.4, (ctx) => {
       const out = ctx.createStereoPanner();
       out.pan.value = Math.max(-1, Math.min(1, pan));
@@ -181,7 +203,7 @@ class SoundEngine {
 
   /** Lighter: the flint "cetek" and a short gas whoosh. */
   lighter(): void {
-    if (!this.noise || !this.bus) return;
+    if (!this.noise || !this.bus || !this.cues.lighter) return;
     this.play(0.8, (ctx) => {
       const t = ctx.currentTime;
       this.burst(t, 0.03, "highpass", 2500, 0.7, 0.5, 0.025);

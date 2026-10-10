@@ -78,7 +78,7 @@ const SKIN_LIGHT = "#e2b48c";
 const SKIN_DARK = "#8e5b3c";
 
 /** 70 % smoke kretek, 25 % vape, 5 % do not smoke; separate from the look's own random rolls. */
-export function habitFor(id: string): Habit {
+export function seededHabit(id: string): Habit {
   const roll = hash32(`habit:${id}`) % 100;
   return roll < 70 ? "kretek" : roll < 95 ? "vape" : "none";
 }
@@ -119,7 +119,7 @@ export function lookFor(id: string): Look {
     hairColor,
     cap,
     accessory,
-    habit: habitFor(id),
+    habit: seededHabit(id),
     sandals: pick(r, SANDAL_COLORS),
     scale: 0.96 + r() * 0.08,
     seed,

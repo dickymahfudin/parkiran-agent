@@ -7,6 +7,7 @@ import { disposeSkinned } from "../characters/dispose.ts";
 import { attach, buildRig, useCharacterAsset } from "../characters/characterAsset.ts";
 import { envState } from "../env/envState.ts";
 import { CAR_LENGTH } from "../layout.ts";
+import { useApp } from "../../state/store.ts";
 import { timeControl } from "../timeControl.ts";
 import { AssetBoundary, canvasTexture } from "./assets.tsx";
 import { StaticMerge } from "./StaticMerge.tsx";
@@ -500,14 +501,19 @@ function useStreetTraffic() {
 
 export function Ambient() {
   const road = useStreetTraffic();
+  // Traffic off (settings): no cars or ojek drawn. The street simulation keeps its few numbers ticking, so turning it
+  // back on resumes mid-flow instead of with an empty road.
+  const traffic = useApp((st) => st.settings.traffic);
   return (
     <group>
-      <Traffic cars={road.cars} />
-      <AssetBoundary name="riders">
-        <Suspense fallback={null}>
-          <ScooterTraffic scooters={road.scooters} />
-        </Suspense>
-      </AssetBoundary>
+      {traffic && <Traffic cars={road.cars} />}
+      {traffic && (
+        <AssetBoundary name="riders">
+          <Suspense fallback={null}>
+            <ScooterTraffic scooters={road.scooters} />
+          </Suspense>
+        </AssetBoundary>
+      )}
       <Cat />
       <Leaves />
     </group>

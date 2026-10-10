@@ -4,6 +4,7 @@ import type { Cue } from "../../../shared/src/session.ts";
 import { isClockTime } from "../../../shared/src/sun.ts";
 import { assignTwinNumbers } from "../hud/labels.ts";
 import { isTimeMode, presetTime, type TimeMode } from "../scene/env/timeOfDay.ts";
+import { SETTINGS_KEY, applySettings, parseSettings, type Settings, type SettingsPatch } from "./settings.ts";
 import { keepSelection, nextClockOffset, pruneAcknowledged } from "./sync.ts";
 
 export type ConnectionStatus = "connecting" | "open" | "closed";
@@ -56,6 +57,22 @@ function savedTimeMode(): TimeMode {
   }
 }
 
+function savedSettings(): Settings {
+  try {
+    return parseSettings(localStorage.getItem(SETTINGS_KEY));
+  } catch {
+    return parseSettings(null);
+  }
+}
+
+function saveSettings(settings: Settings): void {
+  try {
+    localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
+  } catch {
+    // Not persisted; the change still applies for this visit.
+  }
+}
+
 function urlTime(raw: string | null): string | null {
   if (raw === null) return null;
   if (isClockTime(raw)) return raw;
@@ -91,6 +108,12 @@ interface AppState {
   notificationsEnabled: boolean;
   /** The session list folded down to its header and summary (remembered in this browser). */
   sessionsCollapsed: boolean;
+  /** Viewer settings from the settings panel (battery, food carts, traffic, name tags, single sounds). */
+  settings: Settings;
+  updateSettings(patch: SettingsPatch): void;
+  /** The settings panel is open (not stored). */
+  settingsOpen: boolean;
+  setSettingsOpen(open: boolean): void;
   /** Rendering light because the window is in the background (set by the frame limiter, not stored). */
   powerSave: boolean;
   setPowerSave(on: boolean): void;
@@ -117,6 +140,8 @@ interface AppState {
   acknowledge(sessionId: string): void;
 }
 
+const initialSettings = savedSettings();
+
 export const useApp = create<AppState>((set) => ({
   connection: "connecting",
   connectionError: null,
@@ -132,15 +157,26 @@ export const useApp = create<AppState>((set) => ({
   timeOverride: urlTime(params.get("time")) ?? presetTime(savedTimeMode()),
   assetErrors: [],
   readyParts: [],
-  cameraMode: params.has("cinematic") ? "cinematic" : "orbit",
+  // `?cinematic`, or the "Start in cinematic" setting.
+  cameraMode: params.has("cinematic") || initialSettings.startCinematic ? "cinematic" : "orbit",
   viewResets: 0,
-  compact: params.has("compact"),
+  // `?compact` forces it on for that page; otherwise the last choice in this browser.
+  compact: params.has("compact") || pref("compact", false),
   audioEnabled: pref("audio", true),
   audioUnlocked: false,
   // On by default (user's choice): the browser's permission prompt comes with the first click on the page.
   notificationsEnabled: pref("notifications", true),
   sessionsCollapsed: pref("sessionsCollapsed", false),
   eventsCollapsed: pref("eventsCollapsed", false),
+  settings: initialSettings,
+  updateSettings: (patch) =>
+    set((st) => {
+      const settings = applySettings(st.settings, patch);
+      saveSettings(settings);
+      return { settings };
+    }),
+  settingsOpen: false,
+  setSettingsOpen: (settingsOpen) => set({ settingsOpen }),
   powerSave: false,
   setPowerSave: (powerSave) => set({ powerSave }),
   acknowledged: {},
@@ -206,7 +242,10 @@ export const useApp = create<AppState>((set) => ({
     }),
   setCameraMode: (cameraMode) => set({ cameraMode }),
   resetView: () => set((st) => ({ viewResets: st.viewResets + 1, selectedId: null, cameraMode: "orbit" })),
-  setCompact: (compact) => set({ compact }),
+  setCompact: (compact) => {
+    savePref("compact", compact);
+    set({ compact });
+  },
   setAudioEnabled: (audioEnabled) => {
     savePref("audio", audioEnabled);
     set({ audioEnabled });

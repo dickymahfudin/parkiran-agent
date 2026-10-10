@@ -52,4 +52,19 @@ describe("frame pacing", () => {
     expect(isLite(false, LITE_AFTER_MS - 1)).toBe(false);
     expect(isLite(false, LITE_AFTER_MS)).toBe(true);
   });
+
+  test("battery settings: Saver never goes above 20 and is always light, Smooth never drops below 30 and is never light", () => {
+    const watch = { focused: true, quiet: false, cinematic: false, stillForMs: STILL_AFTER_MS };
+    expect(targetFps(watch, "saver")).toBe(20);
+    expect(targetFps({ ...watch, stillForMs: 0 }, "saver")).toBe(20);
+    expect(targetFps({ ...watch, quiet: true }, "saver")).toBe(15);
+    expect(targetFps({ ...watch, focused: false }, "saver")).toBe(10);
+    expect(targetFps(watch, "smooth")).toBe(60);
+    expect(targetFps({ ...watch, quiet: true }, "smooth")).toBe(30);
+    expect(targetFps({ ...watch, focused: false }, "smooth")).toBe(30);
+    expect(targetFps(watch)).toBe(targetFps(watch, "balanced"));
+    expect(isLite(true, 0, "saver")).toBe(true);
+    expect(isLite(false, 60_000, "smooth")).toBe(false);
+    expect(isLite(false, LITE_AFTER_MS, "balanced")).toBe(true);
+  });
 });

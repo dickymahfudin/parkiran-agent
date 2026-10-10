@@ -24,7 +24,7 @@ export const HOUSE_DEPTH = 4;
 export const HOUSE_Z = BACK_WALL_Z - 4.2;
 export const HOUSE_FRONT_Z = HOUSE_Z + HOUSE_DEPTH / 2;
 /** Pedestrians come and go along the gang's street edge, off the road (cars and ojek fill the lanes). */
-const FOOTPATH_X = -6.25;
+export const FOOTPATH_X = -6.25;
 /** Power/lamp poles on the lot-side kerb (base radius 0.14), clear of the near lane's mirrors and ojek. */
 export const STREET_POLES = [
   { x: -6.72, z: -6.15 },

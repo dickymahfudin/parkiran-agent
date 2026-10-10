@@ -1,10 +1,10 @@
 import { useCallback, useEffect, useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from "react";
 import type { PublicSession } from "../../../shared/src/protocol.ts";
-import { requestNotificationPermission } from "../notify/notifier.ts";
 import { lookFor } from "../scene/characters/identity.ts";
 import { TIME_PRESETS, modeOf, type TimeMode } from "../scene/env/timeOfDay.ts";
 import { SCENE_PARTS, serverNow, useApp } from "../state/store.ts";
 import { Icon, ParkingMark } from "./icons.tsx";
+import { SettingsPanel } from "./SettingsPanel.tsx";
 import { GROUP_COLOR, TIMELINE_COLOR, TIMELINE_LABEL, formatSpan, timelineSegments, timelineTotals, toolMixRows, waitedTotal } from "./insights.ts";
 import {
   DENSE_FROM,
@@ -407,10 +407,9 @@ function Toolbar() {
   const compact = useApp((st) => st.compact);
   const audioEnabled = useApp((st) => st.audioEnabled);
   const audioUnlocked = useApp((st) => st.audioUnlocked);
-  const notificationsEnabled = useApp((st) => st.notificationsEnabled);
   const timeOverride = useApp((st) => st.timeOverride);
+  const settingsOpen = useApp((st) => st.settingsOpen);
   const set = useApp.getState();
-  const notifyBlocked = typeof Notification !== "undefined" && Notification.permission === "denied";
   return (
     <div className="panel toolbar" role="toolbar" aria-label="View">
       {!compact && (
@@ -436,16 +435,6 @@ function Toolbar() {
       <button
         type="button"
         className="tool-icon"
-        aria-pressed={compact}
-        onClick={() => set.setCompact(!compact)}
-        title={compact ? "Full view" : "Compact mode for a second monitor"}
-        aria-label="Compact mode"
-      >
-        <Icon name={compact ? "expand" : "compact"} />
-      </button>
-      <button
-        type="button"
-        className="tool-icon"
         aria-pressed={audioEnabled}
         onClick={() => set.setAudioEnabled(!audioEnabled)}
         title={audioUnlocked ? (audioEnabled ? "Sound on" : "Sound off") : "Sound starts after your first click"}
@@ -453,21 +442,19 @@ function Toolbar() {
       >
         <Icon name={audioEnabled ? "soundOn" : "soundOff"} />
       </button>
+      {!compact && <TimeControl override={timeOverride} />}
       <button
         type="button"
-        className="tool-icon"
-        aria-pressed={notificationsEnabled && !notifyBlocked}
-        disabled={notifyBlocked}
-        title={notifyBlocked ? "Notifications are blocked by the browser" : "Notify me when a session needs me"}
-        aria-label="Notifications"
-        onClick={() => {
-          set.setNotificationsEnabled(!notificationsEnabled);
-          if (!notificationsEnabled) void requestNotificationPermission();
-        }}
+        className="tool-icon settings-button"
+        aria-haspopup="dialog"
+        aria-expanded={settingsOpen}
+        aria-pressed={settingsOpen}
+        onClick={() => set.setSettingsOpen(!settingsOpen)}
+        title="Settings: sounds, notifications, display, battery, street life"
+        aria-label="Settings"
       >
-        <Icon name={notificationsEnabled && !notifyBlocked ? "bellOn" : "bellOff"} />
+        <Icon name="settings" />
       </button>
-      {!compact && <TimeControl override={timeOverride} />}
       {import.meta.env.DEV && !compact && (
         <label className="time-override" title="Scene time override (dev)">
           <input type="time" value={timeOverride ?? ""} onChange={(e) => set.setTimeOverride(e.target.value || null)} />
@@ -507,7 +494,8 @@ function EventFeed({ now }: { now: number }) {
   const sessions = useApp((st) => st.sessions);
   const twins = useApp((st) => st.twins);
   const collapsed = useApp((st) => st.eventsCollapsed);
-  const [filter, setFilter] = useState<FeedFilter>("all");
+  // Starts on the filter chosen in the settings; switching here is for this visit only.
+  const [filter, setFilter] = useState<FeedFilter>(() => (useApp.getState().settings.feedFilter === "needsYou" ? "attention" : "all"));
   // The newest event when the feed was folded (or the page loaded folded): only later ones count.
   const [seenSeq, setSeenSeq] = useState(() => useApp.getState().cueSeq);
   const unseen = collapsed ? unseenAttention(cueLog, seenSeq, sessions) : 0;
@@ -676,6 +664,7 @@ export function Hud() {
       <Attention list={list} now={now} />
       <NeedAnnouncer list={list} />
       <Toolbar />
+      <SettingsPanel />
       {selected && !compact && <Detail s={selected} now={now} onClose={closeDetail} />}
       {!compact && <EventFeed now={now} />}
       <Loader />

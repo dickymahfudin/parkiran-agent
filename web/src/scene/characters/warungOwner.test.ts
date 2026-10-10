@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import type { Clip, Frame } from "./brain.ts";
-import { OWNER_SPOT, WarungOwner, isOwnerNight } from "./warungOwner.ts";
+import { OWNER_SPOT, WarungOwner, isOwnerNight, routineFor } from "./warungOwner.ts";
 
 function run(o: WarungOwner, seconds: number): { clips: Set<Clip>; last: Frame } {
   const clips = new Set<Clip>();
@@ -42,6 +42,28 @@ describe("Pak Joko", () => {
     expect(up).toMatchObject({ clip: "buy", sit: 0 });
     o.setServing(false);
     expect(run(o, 4).last).toMatchObject({ clip: "doze", sit: 1 });
+  });
+
+  test("as a non-smoker he never lights up, only sips, scrolls and looks around", () => {
+    const o = new WarungOwner(7, "none");
+    for (let t = 0; t < 600; t += 1 / 30) {
+      const f = o.update(1 / 30);
+      expect(f.clip).not.toBe("smoke");
+      expect(f.props.cigarette).toBe("none");
+    }
+    expect(routineFor("none").map((a) => a.clip)).toEqual(["sip", "phone", "lookAround"]);
+    expect(routineFor("vape").map((a) => a.clip)).toContain("smoke");
+  });
+
+  test("a habit change to no smoking ends a smoke under way at once; back to smoking, the smoke returns", () => {
+    const o = new WarungOwner(7);
+    let f = o.update(1 / 30);
+    for (let t = 0; t < 600 && f.clip !== "smoke"; t += 1 / 30) f = o.update(1 / 30);
+    expect(f).toMatchObject({ clip: "smoke", props: { cigarette: "lit" } });
+    o.setHabit("none");
+    expect(o.update(1 / 30)).toMatchObject({ clip: "standIdle", props: { cigarette: "none" } });
+    o.setHabit("vape");
+    expect(run(o, 600).clips.has("smoke")).toBe(true);
   });
 
   test("late night is 23:00 to 04:30", () => {

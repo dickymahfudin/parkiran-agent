@@ -1239,3 +1239,216 @@ h2 {
   outline: 2px solid #5cc8ff;
   outline-offset: 2px;
 }
+
+/* Settings panel: under the toolbar, outside it (the toolbar resets its own buttons). */
+.settings-panel {
+  /* The toolbar ends at 61 px (16 + 45). */
+  top: 70px;
+  right: 16px;
+  width: 340px;
+  max-width: calc(100vw - 32px);
+  max-height: min(72vh, 680px);
+  overflow-y: auto;
+  padding: 12px 14px 10px;
+  z-index: 3;
+  animation: menu-in 0.14s ease-out;
+}
+.settings-panel > header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 4px;
+}
+.setting-section {
+  padding: 10px 0 8px;
+  border-top: 1px solid rgba(255, 255, 255, 0.07);
+}
+.setting-section:first-of-type {
+  border-top: 0;
+}
+.setting-section h3 {
+  margin: 0 0 6px;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--text);
+}
+.setting-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 5px 0;
+}
+.setting-row.disabled .setting-text {
+  opacity: 0.45;
+}
+.setting-text {
+  display: grid;
+  gap: 1px;
+  min-width: 0;
+}
+.setting-label {
+  font-size: 12.5px;
+  font-weight: 600;
+}
+.setting-hint {
+  font-size: 11px;
+  color: var(--muted);
+  line-height: 1.35;
+}
+.setting-note {
+  margin: 6px 0 0;
+}
+.setting-choice {
+  margin: 2px 0 4px;
+  border: 0;
+  min-width: 0;
+}
+.setting-choice label {
+  flex: 1;
+  text-align: center;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 6px 8px;
+  border-radius: 8px;
+  color: var(--muted);
+}
+.setting-choice label.checked {
+  background: rgba(92, 200, 255, 0.16);
+  color: #bfe9ff;
+}
+.setting-choice label:has(.choice-input:focus-visible) {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+/* The radio itself is invisible but stays focusable and keyboard-operable. */
+.choice-input {
+  position: absolute;
+  opacity: 0;
+  width: 1px;
+  height: 1px;
+  margin: 0;
+  pointer-events: none;
+}
+/* On/off switch: the knob position and colour carry the state, the label and aria-checked say it. */
+.switch {
+  all: unset;
+  flex: none;
+  position: relative;
+  width: 34px;
+  height: 20px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.16);
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+.switch[aria-checked="true"] {
+  background: #3aa9e0;
+}
+/* A finger-sized hit area (about 44 px tall) around the small visible switch. */
+.switch::after {
+  content: "";
+  position: absolute;
+  inset: -12px -8px;
+}
+.switch:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+.switch:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+.switch-knob {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.35);
+  transition: transform 0.15s ease;
+}
+.switch[aria-checked="true"] .switch-knob {
+  transform: translateX(14px);
+}
+.setting-range {
+  width: 100%;
+  margin: 4px 0 6px;
+  accent-color: #3aa9e0;
+}
+.setting-range:disabled {
+  opacity: 0.45;
+}
+.setting-times {
+  display: flex;
+  gap: 10px;
+  padding: 2px 0 6px;
+}
+.setting-times label {
+  flex: 1;
+  display: grid;
+  gap: 3px;
+  font-size: 11px;
+  color: var(--muted);
+}
+.setting-times input {
+  font: inherit;
+  font-size: 12.5px;
+  color: var(--text);
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 8px;
+  padding: 5px 8px;
+  color-scheme: dark;
+}
+.setting-times input:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+.settings-panel > footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-top: 8px;
+  border-top: 1px solid rgba(255, 255, 255, 0.07);
+}
+.setting-reset {
+  all: unset;
+  cursor: pointer;
+  font-size: 11.5px;
+  font-weight: 600;
+  color: #bfe9ff;
+  padding: 4px 6px;
+  border-radius: 6px;
+}
+.setting-reset:hover {
+  background: rgba(255, 255, 255, 0.08);
+}
+.setting-reset:focus-visible {
+  outline: 2px solid var(--accent);
+}
+
+/* After the panel's own rules, so they win: below 1180 px the toolbar sits at the bottom left and the panel opens above
+   it; at phone width it becomes a sheet above the toolbar (which may wrap to two rows). */
+@media (max-width: 1180px) {
+  .settings-panel {
+    top: auto;
+    bottom: 70px;
+    left: 16px;
+    right: auto;
+    max-height: calc(100% - 100px);
+  }
+}
+@media (max-width: 720px) {
+  .settings-panel {
+    left: 12px;
+    right: 12px;
+    width: auto;
+    max-width: none;
+    bottom: 118px;
+    max-height: calc(100% - 150px);
+  }
+}

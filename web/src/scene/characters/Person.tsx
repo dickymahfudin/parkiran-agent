@@ -7,7 +7,6 @@ import * as THREE from "three";
 import { CLIP_SEAT_Y } from "../layout.ts";
 import { sound } from "../../audio/sound.ts";
 import { Icon } from "../../hud/icons.tsx";
-import type { IconName } from "../../hud/labels.ts";
 import { timeControl } from "../timeControl.ts";
 import type { Frame, NeedKind } from "./brain.ts";
 import { B, attach, buildRig, handFrame, useCharacterAsset } from "./characterAsset.ts";
@@ -22,6 +21,7 @@ import { BubbleIcon, type SmokeSource } from "./props.tsx";
 import { CrewHead } from "./Crew.tsx";
 import { characterRoots } from "./registry.ts";
 import { rigPlay, rigTime, type CupHand, type RigPlay } from "./rig.ts";
+import { sameTag, type TagInfo } from "./tags.ts";
 
 /** Anything that yields a frame per tick: a live Brain, or a frozen frame in the state gallery. */
 export interface Animator {
@@ -29,13 +29,7 @@ export interface Animator {
   settle?(): void;
 }
 
-export interface TagInfo {
-  title: string;
-  subtitle: string | null;
-  color: string;
-  text: string;
-  icon: IconName | null;
-}
+export type { TagInfo };
 
 const CATCH_UP_STEP_S = 0.1;
 const MAX_CATCH_UP_S = 60;
@@ -70,9 +64,6 @@ interface Props {
   trackId?: string;
 }
 
-const sameTag = (a: TagInfo | null, b: TagInfo | null): boolean =>
-  a === b || (a !== null && b !== null && a.title === b.title && a.subtitle === b.subtitle && a.color === b.color && a.text === b.text && a.icon === b.icon);
-
 /** Session updates re-render the character list many times a second; a person only re-renders when its tag changes. */
 export const Person = memo(
   PersonView,
@@ -106,6 +97,8 @@ function PersonView({ brain, look, tag, friend, smoke, steam, onSelect, trackId 
   const tipMat = useMemo(() => new THREE.MeshStandardMaterial({ color: "#3a1a0a", emissive: "#ff5a1f", emissiveIntensity: 0 }), []);
   const ledMat = useMemo(() => new THREE.MeshStandardMaterial({ color: "#0b2a33", emissive: "#3fe0ff", emissiveIntensity: 0 }), []);
   const vape = look.habit === "vape";
+  // Only a kretek smoker ever shows a cigarette: a non-smoker has none to show whatever the frame says.
+  const kretek = look.habit === "kretek";
   smoke.vape = vape;
 
   // Bone-held props, placed once in the bind pose.
@@ -395,11 +388,11 @@ function PersonView({ brain, look, tag, friend, smoke, steam, onSelect, trackId 
     lid.current.rotation.x = 1.85 * lidOpen.current;
 
     // A kretek burns (tip, smoke) in the hand or the lips; a vape is only ever in the hand, and "mouth" means put away.
-    const lit = !vape && (p.cigarette === "lit" || p.cigarette === "mouth");
+    const lit = kretek && (p.cigarette === "lit" || p.cigarette === "mouth");
     const vaping = vape && p.cigarette === "lit";
-    const inMouth = !vape && (p.cigarette === "unlit" || p.cigarette === "mouth" || f.clip === "lightUp");
-    props.mouthCig.visible = !vape && p.cigarette !== "none" && inMouth;
-    props.handCig.visible = !vape && p.cigarette !== "none" && !inMouth;
+    const inMouth = kretek && (p.cigarette === "unlit" || p.cigarette === "mouth" || f.clip === "lightUp");
+    props.mouthCig.visible = kretek && p.cigarette !== "none" && inMouth;
+    props.handCig.visible = kretek && p.cigarette !== "none" && !inMouth;
     props.vapeGrip.visible = vape && (p.cigarette === "lit" || p.cigarette === "unlit");
     let drawing = 0;
     let exhale = -1;
@@ -472,9 +465,9 @@ function PersonView({ brain, look, tag, friend, smoke, steam, onSelect, trackId 
     >
       <primitive object={rig.object} />
       {/* Props live inside the skeleton (bone children); portals render into them without reparenting. */}
-      {!vape && createPortal(<Cigarette tip={tipHand} tipMat={tipMat} />, props.handCig)}
+      {kretek && createPortal(<Cigarette tip={tipHand} tipMat={tipMat} />, props.handCig)}
       {vape && createPortal(<Vape led={ledMat} />, props.vapeGrip)}
-      {!vape && createPortal(<Cigarette tip={tipMouth} tipMat={tipMat} />, props.mouthCig)}
+      {kretek && createPortal(<Cigarette tip={tipMouth} tipMat={tipMat} />, props.mouthCig)}
       {createPortal(<Lighter flame={flame} />, props.lighter)}
       {createPortal(<Lighter flame={flameR} />, props.lighterR)}
       {createPortal(<Phone seed={look.seed} />, props.phoneL)}
@@ -532,10 +525,12 @@ function PersonView({ brain, look, tag, friend, smoke, steam, onSelect, trackId 
               <span className="name-tag-dot" style={{ background: tag.color }} />
               <span className="name-tag-title">{tag.title}</span>
               {tag.subtitle && <span className="name-tag-sub">{tag.subtitle}</span>}
-              <span className="name-tag-state" style={{ color: tag.color }}>
-                {tag.icon && <Icon name={tag.icon} />}
-                {tag.text}
-              </span>
+              {(tag.text || tag.icon) && (
+                <span className="name-tag-state" style={{ color: tag.color }}>
+                  {tag.icon && <Icon name={tag.icon} />}
+                  {tag.text}
+                </span>
+              )}
             </div>
           </Html>
         )}

@@ -97,9 +97,9 @@ minutes) and an empty kopi glass stays behind after every compaction, so you can
 without the HUD.
 
 **Pak Joko** keeps the warung: behind his counter he smokes, sips, scrolls his phone and looks around, hands the kopi
-over when someone comes to buy, and naps on his stool from 23:00 to 04:30. In the evening a bakso or nasi goreng cart
-is pushed past on the far pavement now and then (at most one every 10 minutes, until 01:00), with its "ting-ting" or
-"tek-tek".
+over when someone comes to buy, and naps on his stool from 23:00 to 04:30. From 17:00 to 01:00 a bakso or nasi goreng vendor calls at the lot every 5 minutes: he pushes the cart in
+along the footpath, stops by the lot's west edge for 45 s with his "ting-ting" or "tek-tek", backs out to the mouth of
+the gang, turns round and leaves (off, evenings or all day in the settings).
 
 When every seat is taken, newcomers and friends stand at their own spot (clear of the sitters, the cars and the
 walking lanes, never inside each other) and sit down as soon as a seat frees up.
@@ -118,13 +118,12 @@ the lot in between, now and then visiting someone at work.
 
 **Street:** cars and ojek share each lane single file and keep a safe gap to whoever is ahead.
 
-**Performance and battery:** 60 fps while the view moves (you drag, scroll or click, or the camera follows someone;
-evenly paced on 120 Hz screens), 30 fps while you watch sessions work from a still camera, 20 fps when every session is
-idle and nobody is selected, 15 fps with another window in front, and nothing at all in a hidden tab. After 3 s in the
-background it also renders light (resolution 1, no ambient occlusion) and comes back to full quality the moment the
-window does. Resolution drops in three steps (1.5 → 1.25 → 1) when frames run slow, and every shader is compiled up front
-so props never stall a frame when they first appear. About 570 draw calls and 650k triangles a frame with six people in
-the lot.
+**Performance and battery:** by default (Saver) the lot renders at most 20 fps, 15 when it is quiet and 10 with
+another window in front, always light (resolution 1, no ambient occlusion), and nothing at all in a hidden tab. Balanced
+(settings) gives 60 fps while the view moves (evenly paced on 120 Hz screens), 30 while you watch sessions work, 20 on a
+quiet lot and 15 behind other windows, and renders light only after 3 s in the background. Resolution drops in three
+steps (1.5 → 1.25 → 1) when frames run slow, and every shader is compiled up front so props never stall a frame when they
+first appear. About 570 draw calls and 650k triangles a frame with six people in the lot.
 
 **Sound:** procedural cues, no audio files: the chime when a session needs you, a soft "ting" when a turn is done, the
 lighter, and the food carts' "ting-ting" / "tek-tek" as they pass. There is no background ambience (street, keyboards,
@@ -142,16 +141,27 @@ the list by state, and the fold button tucks it away down to the summary (rememb
 tool, calls, how often it asked you and how long it waited for you, its last hour as a strip, and its tool mix); the camera
 follows it, `Esc` lets go). Sessions waiting on you also appear as a banner at the top until they are handled; the event
 feed has an "All / Needs you" filter, marks milestones (100 tool calls, 1 h of work, the 2nd compaction), and folds to
-its header (remembered per browser); folded, the header counts the events that needed you since. The toolbar has free / cinematic camera, reset view, compact mode for a second
-monitor, sound, notifications and the time of day (plus a free time input in dev mode). A loading screen covers the lot until
+its header (remembered per browser); folded, the header counts the events that needed you since. The toolbar keeps only
+what you reach for often: orbit / cinematic camera, reset view, a sound mute, the time of day (plus a free time input in
+dev mode) and a gear for the settings. A loading screen covers the lot until
 every part of the scene has arrived. States and events use stroke icons (Lucide), no emoji. Plain facts read in English; the warung jokes stay ("cari korek", "batal
 ngerokok", "bawa kopi").
 
 **Notifications:** when a session needs you, a chime plays (and repeats every 25 s); when the page is not focused you
 also get a system notification such as "warung-app needs permission" with the branch, which disappears as soon as the
-session is handled. The bell is on by default (the browser asks for permission on your first click) and can be turned
-off in the toolbar; the choice is remembered per browser. Clicking the character silences the chime; it never changes the real session. Sound starts after your
+session is handled. System notifications are on by default (the browser asks for permission on your first click) and
+can be turned off in the settings; the choice is remembered per browser. Clicking the character silences the chime; it never changes the real session. Sound starts after your
 first click on the page (browser rule).
+
+**Settings** (gear in the toolbar; saved per browser, Esc or a click outside closes them):
+
+| Group | Setting | Default |
+|---|---|---|
+| Sound | All sounds (also the toolbar's speaker); volume (let go of the slider to hear the chime); one by one: needs-you chime, turn-done ting, lighter, food carts | on; 100 %; all on |
+| Notifications | System notifications when the page is not in front; chime repeats every 25 s / every minute / once; quiet hours (no chime in a window you pick, the banner and system notifications still come) | on; 25 s; off (22:00–07:00 when on) |
+| Display | Compact mode for a second monitor (`?compact` still forces it); name tags off / name / full (need bubbles always show); smoking: mixed / nobody / vapes only (Pak Joko and the ashtrays too); start in cinematic; the event feed's starting filter | off; full; mixed; off; All |
+| Battery | Saver (20 fps at most, always light) / Balanced (60 moving, 30 watching, 15 behind) / Smooth (60 nearly always) | Saver |
+| Street life | Food carts: off / evenings (17:00–01:00) / all day; traffic (cars and ojek) on or off | evenings; on |
 
 URL options: `?time=21:00` (fixed scene time), `?compact`, `?cinematic`, `?stats` (frame-rate meter); in dev mode also
 `?cam=px,py,pz,tx,ty,tz`, `?cart=bakso|nasgor` (a cart right now) and `?gallery`.
@@ -215,7 +225,8 @@ assets/   asset archive (+ raw downloads and Blender output, gitignored)
   `PARKIRAN_RELAY_DEBUG=1` in `.env` writes relay errors to `logs/`.
 - **"asset failed to load" in the HUD:** run `bun install` again (re-extracts the archive).
 - **Hooks stopped after a Bun upgrade:** `bun run install-hooks` again (the hook pins the bun binary path).
-- **No notifications:** allow notifications for 127.0.0.1 in the browser, then turn on the bell in the toolbar.
+- **No notifications:** allow notifications for 127.0.0.1 in the browser, then turn on **System notifications** in the
+  settings (gear in the toolbar).
 
 ## License
 
