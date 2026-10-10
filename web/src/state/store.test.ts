@@ -114,3 +114,27 @@ describe("store after a reconnect", () => {
     expect(near(useApp.getState().clockOffset, 1000)).toBe(true);
   });
 });
+
+describe("the inspector's tab", () => {
+  test("selecting a session opens the Session tab; clearing it or resetting the view goes back to Events", () => {
+    const st = useApp.getState();
+    st.apply(hello([session("a"), session("b")]));
+    st.setInspectorTab("events");
+    useApp.getState().select("a");
+    expect(useApp.getState().inspectorTab).toBe("session");
+    useApp.getState().setInspectorTab("events");
+    useApp.getState().select("b");
+    expect(useApp.getState().inspectorTab).toBe("session");
+    useApp.getState().select(null);
+    expect(useApp.getState().inspectorTab).toBe("events");
+    useApp.getState().select("a");
+    useApp.getState().resetView();
+    expect([useApp.getState().selectedId, useApp.getState().inspectorTab]).toEqual([null, "events"]);
+  });
+
+  test("the user can still pick a tab by hand", () => {
+    useApp.getState().select(null);
+    useApp.getState().setInspectorTab("session");
+    expect(useApp.getState().inspectorTab).toBe("session");
+  });
+});

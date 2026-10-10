@@ -1,32 +1,26 @@
 import { useCallback, useEffect, useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from "react";
 import type { PublicSession } from "../../../shared/src/protocol.ts";
-import { lookFor } from "../scene/characters/identity.ts";
 import { TIME_PRESETS, modeOf, type TimeMode } from "../scene/env/timeOfDay.ts";
 import { SCENE_PARTS, serverNow, useApp } from "../state/store.ts";
 import { Icon, ParkingMark } from "./icons.tsx";
+import { Inspector } from "./Inspector.tsx";
 import { SettingsPanel } from "./SettingsPanel.tsx";
-import { GROUP_COLOR, TIMELINE_COLOR, TIMELINE_LABEL, formatSpan, timelineSegments, timelineTotals, toolMixRows, waitedTotal } from "./insights.ts";
+import { ShortcutsSheet } from "./ShortcutsSheet.tsx";
 import {
   DENSE_FROM,
   MOOD_COLOR,
   MOOD_NAME,
   NEED_ICON,
-  cueLine,
-  type CueLine,
   type IconName,
-  type StateLabel,
   formatAge,
-  formatDuration,
   formatToolName,
   moodCounts,
   orderSessions,
   sessionName,
-  shortId,
   stateLabel,
-  unseenAttention,
-  ATTENTION_MOODS,
   type Mood,
 } from "./labels.ts";
+import { Avatar, StateChip } from "./parts.tsx";
 
 function useNow(intervalMs: number): number {
   const [now, setNow] = useState(serverNow);
@@ -41,32 +35,6 @@ function useNow(intervalMs: number): number {
 const CONNECTION_TEXT = { connecting: "connecting…", open: "live", closed: "offline" } as const;
 const NEED_PHRASE = { permission: "needs permission", question: "has a question", input: "needs input" } as const;
 const MAX_ATTENTION = 3;
-
-/** Dark or light text, whichever reads on `hex`. */
-function inkOn(hex: string): string {
-  const [r, g, b] = [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16) / 255);
-  return 0.299 * r! + 0.587 * g! + 0.114 * b! > 0.6 ? "#14161b" : "#f4f6f8";
-}
-
-/** The character's shirt colour with the project's initial, so a row is easy to match to a person in the lot. */
-function Avatar({ s }: { s: PublicSession }) {
-  const shirt = lookFor(s.id).shirtColor;
-  return (
-    <span className="avatar" style={{ background: shirt, color: inkOn(shirt) }} aria-hidden="true">
-      {(s.project ?? "?").slice(0, 1).toUpperCase()}
-    </span>
-  );
-}
-
-/** A session's state as a coloured chip, with its icon when the state has one. */
-function StateChip({ label }: { label: StateLabel }) {
-  return (
-    <span className="chip" style={{ background: MOOD_COLOR[label.mood] }}>
-      {label.icon && <Icon name={label.icon} />}
-      {label.text}
-    </span>
-  );
-}
 
 function SessionRow({ s, now, selected, onSelect }: { s: PublicSession; now: number; selected: boolean; onSelect(): void }) {
   const label = stateLabel(s, now);
@@ -166,96 +134,6 @@ function EmptyLot() {
       <p className="empty-hint">
         Nothing showing up? Run <code>bun run install-hooks</code> once.
       </p>
-    </div>
-  );
-}
-
-function Detail({ s, now, onClose }: { s: PublicSession; now: number; onClose(): void }) {
-  const label = stateLabel(s, now);
-  const twins = useApp((st) => st.twins);
-  const rows: [string, string][] = [
-    ["Branch", s.branch ?? "–"],
-    ["Tool", s.currentTool ? `${formatToolName(s.currentTool)} (running)` : s.lastTool ? formatToolName(s.lastTool) : "–"],
-    ["Tool calls", String(s.toolCalls)],
-    ["Session duration", formatDuration(now - s.startedAt)],
-    ["Last event", `${s.lastEvent} · ${formatAge(now - s.lastEventAt)}`],
-    ["Subagents", String(Object.keys(s.subagents).length)],
-    ["Asked you", `${s.asks}×`],
-    ["Waited for you", formatSpan(waitedTotal(s, now))],
-    ["Session ID", shortId(s.id)],
-  ];
-  return (
-    <section className="panel detail-panel" aria-label="Session details">
-      <header>
-        <Avatar s={s} />
-        <div className="detail-heading">
-          <h2 className="detail-title">{sessionName(s, twins)}</h2>
-          <StateChip label={label} />
-        </div>
-        <button type="button" className="icon-button" onClick={onClose} aria-label="Close" title="Close (Esc)">
-          <Icon name="close" />
-        </button>
-      </header>
-      <dl>
-        {rows.map(([k, v]) => (
-          <div key={k} className="detail-row">
-            <dt>{k}</dt>
-            <dd>{v}</dd>
-          </div>
-        ))}
-      </dl>
-      <Insights s={s} now={now} />
-    </section>
-  );
-}
-
-/** The session's last hour as a strip, and its tool mix. Colours always come with a label. */
-function Insights({ s, now }: { s: PublicSession; now: number }) {
-  const segments = timelineSegments(s.timeline, now);
-  const totals = timelineTotals(segments);
-  const mix = toolMixRows(s.toolMix);
-  return (
-    <div className="insights">
-      <h3>Last hour</h3>
-      <div className="timeline" role="img" aria-label={totals.map((t) => `${TIMELINE_LABEL[t.state]} ${formatSpan(t.ms)}`).join(", ") || "No activity yet"}>
-        {segments.map((g) => (
-          <span
-            key={g.start}
-            style={{ left: `${g.start * 100}%`, width: `${g.width * 100}%`, background: TIMELINE_COLOR[g.state] }}
-            title={`${TIMELINE_LABEL[g.state]} · ${formatSpan(g.ms)}`}
-          />
-        ))}
-      </div>
-      <div className="timeline-axis" aria-hidden="true">
-        <span>1 h ago</span>
-        <span>now</span>
-      </div>
-      <ul className="legend">
-        {totals.map((t) => (
-          <li key={t.state}>
-            <i style={{ background: TIMELINE_COLOR[t.state] }} />
-            {TIMELINE_LABEL[t.state]} <b>{formatSpan(t.ms)}</b>
-          </li>
-        ))}
-      </ul>
-      {mix.length > 0 && (
-        <>
-          <h3>Tool mix</h3>
-          <div className="mix-bar" aria-hidden="true">
-            {mix.map((r) => (
-              <span key={r.group} style={{ flexGrow: r.count, background: GROUP_COLOR[r.group] }} />
-            ))}
-          </div>
-          <ul className="legend">
-            {mix.map((r) => (
-              <li key={r.group}>
-                <i style={{ background: GROUP_COLOR[r.group] }} />
-                {r.label} <b>{r.count}</b>
-              </li>
-            ))}
-          </ul>
-        </>
-      )}
     </div>
   );
 }
@@ -402,6 +280,10 @@ function TimeControl({ override }: { override: string | null }) {
   );
 }
 
+/**
+ * The view toolbar, in three groups: the camera [Orbit | Cinematic][Reset] · the scene clock · [Sound][Settings].
+ * Compact mode keeps the last group only.
+ */
 function Toolbar() {
   const cameraMode = useApp((st) => st.cameraMode);
   const compact = useApp((st) => st.compact);
@@ -413,158 +295,61 @@ function Toolbar() {
   return (
     <div className="panel toolbar" role="toolbar" aria-label="View">
       {!compact && (
-        <div className="segmented">
-          <button type="button" aria-pressed={cameraMode === "orbit"} onClick={() => set.setCameraMode("orbit")} title="Drag to orbit, scroll to zoom">
-            Orbit
-          </button>
-          <button
-            type="button"
-            aria-pressed={cameraMode === "cinematic"}
-            onClick={() => set.setCameraMode("cinematic")}
-            title="Director: the camera goes where things happen"
-          >
-            Cinematic
-          </button>
-        </div>
-      )}
-      {!compact && (
-        <button type="button" className="tool-icon" onClick={() => set.resetView()} title="Reset view (R, or double-click the ground)" aria-label="Reset view">
-          <Icon name="reset" />
-        </button>
-      )}
-      <button
-        type="button"
-        className="tool-icon"
-        aria-pressed={audioEnabled}
-        onClick={() => set.setAudioEnabled(!audioEnabled)}
-        title={audioUnlocked ? (audioEnabled ? "Sound on" : "Sound off") : "Sound starts after your first click"}
-        aria-label="Sound"
-      >
-        <Icon name={audioEnabled ? "soundOn" : "soundOff"} />
-      </button>
-      {!compact && <TimeControl override={timeOverride} />}
-      <button
-        type="button"
-        className="tool-icon settings-button"
-        aria-haspopup="dialog"
-        aria-expanded={settingsOpen}
-        aria-pressed={settingsOpen}
-        onClick={() => set.setSettingsOpen(!settingsOpen)}
-        title="Settings: sounds, notifications, display, battery, street life"
-        aria-label="Settings"
-      >
-        <Icon name="settings" />
-      </button>
-      {import.meta.env.DEV && !compact && (
-        <label className="time-override" title="Scene time override (dev)">
-          <input type="time" value={timeOverride ?? ""} onChange={(e) => set.setTimeOverride(e.target.value || null)} />
-          {timeOverride && (
-            <button type="button" onClick={() => set.setTimeOverride(null)}>
-              live
-            </button>
-          )}
-        </label>
-      )}
-    </div>
-  );
-}
-
-/** The line's text with its Indonesian part marked for screen readers. */
-function CueText({ line }: { line: CueLine }) {
-  const i = line.joke ? line.text.indexOf(line.joke) : -1;
-  if (!line.joke || i < 0) return <>{line.text}</>;
-  return (
-    <>
-      {line.text.slice(0, i)}
-      <span lang="id">{line.joke}</span>
-      {line.text.slice(i + line.joke.length)}
-    </>
-  );
-}
-
-type FeedFilter = "all" | "attention";
-
-/**
- * The event feed. Folds to its header (remembered per browser) like the session list; while folded, the header counts
- * the "needs you" events that arrived since, and the count clears when the feed is opened. It never opens by itself:
- * the attention banner already covers what needs you.
- */
-function EventFeed({ now }: { now: number }) {
-  const cueLog = useApp((st) => st.cueLog);
-  const sessions = useApp((st) => st.sessions);
-  const twins = useApp((st) => st.twins);
-  const collapsed = useApp((st) => st.eventsCollapsed);
-  // Starts on the filter chosen in the settings; switching here is for this visit only.
-  const [filter, setFilter] = useState<FeedFilter>(() => (useApp.getState().settings.feedFilter === "needsYou" ? "attention" : "all"));
-  // The newest event when the feed was folded (or the page loaded folded): only later ones count.
-  const [seenSeq, setSeenSeq] = useState(() => useApp.getState().cueSeq);
-  const unseen = collapsed ? unseenAttention(cueLog, seenSeq, sessions) : 0;
-  const fold = (on: boolean) => {
-    setSeenSeq(useApp.getState().cueSeq);
-    useApp.getState().setEventsCollapsed(on);
-  };
-  const lines = collapsed
-    ? []
-    : cueLog.map((e) => ({ e, line: cueLine(e.cue, sessions[e.cue.sessionId]) })).filter(({ line }) => filter === "all" || ATTENTION_MOODS.has(line.mood));
-  return (
-    <section className={`panel cue-panel${collapsed ? " collapsed" : ""}`} aria-label="Events">
-      <header>
-        <h2>Events</h2>
-        {collapsed ? (
-          unseen > 0 && (
-            <span className="feed-unseen" title="Events that need you since the feed was folded">
-              {unseen} {unseen === 1 ? "needs you" : "need you"}
-            </span>
-          )
-        ) : (
-          <div className="segmented small">
-            <button type="button" aria-pressed={filter === "all"} onClick={() => setFilter("all")}>
-              All
-            </button>
-            <button type="button" aria-pressed={filter === "attention"} onClick={() => setFilter("attention")}>
-              Needs you
+        <>
+          <div className="toolbar-group">
+            <div className="segmented">
+              <button type="button" aria-pressed={cameraMode === "orbit"} onClick={() => set.setCameraMode("orbit")} title="Drag to orbit, scroll to zoom">
+                Orbit
+              </button>
+              <button
+                type="button"
+                aria-pressed={cameraMode === "cinematic"}
+                onClick={() => set.setCameraMode("cinematic")}
+                title="Director: the camera goes where things happen"
+              >
+                Cinematic
+              </button>
+            </div>
+            <button
+              type="button"
+              className="tool-icon"
+              onClick={() => set.resetView()}
+              title="Reset view (R, or double-click the ground)"
+              aria-label="Reset view"
+            >
+              <Icon name="reset" />
             </button>
           </div>
-        )}
+          <span className="toolbar-sep" aria-hidden="true" />
+          <TimeControl override={timeOverride} />
+          <span className="toolbar-sep" aria-hidden="true" />
+        </>
+      )}
+      <div className="toolbar-group">
         <button
           type="button"
-          className="icon-button fold"
-          aria-expanded={!collapsed}
-          aria-label={collapsed ? "Show the events" : "Fold the events"}
-          title={collapsed ? "Show the events" : "Fold the events (the header keeps counting what needs you)"}
-          onClick={() => fold(!collapsed)}
+          className="tool-icon"
+          aria-pressed={audioEnabled}
+          onClick={() => set.setAudioEnabled(!audioEnabled)}
+          title={audioUnlocked ? (audioEnabled ? "Sound on" : "Sound off") : "Sound starts after your first click"}
+          aria-label="Sound"
         >
-          <Icon name={collapsed ? "collapse" : "expandList"} />
+          <Icon name={audioEnabled ? "soundOn" : "soundOff"} />
         </button>
-      </header>
-      {collapsed ? null : lines.length === 0 ? (
-        <p className="feed-empty">
-          {filter === "all" ? (
-            "Events show up here as sessions work."
-          ) : (
-            <>
-              Nothing needs you. <span lang="id">Santai dulu.</span>
-            </>
-          )}
-        </p>
-      ) : (
-        <ol>
-          {lines.map(({ e, line }) => (
-            <li key={e.seq} className={`mood-${line.mood}`}>
-              <span className="cue-icon" aria-hidden="true">
-                <Icon name={line.icon} />
-              </span>
-              <span className="cue-text">
-                <b>{sessions[e.cue.sessionId] ? sessionName(sessions[e.cue.sessionId]!, twins) : shortId(e.cue.sessionId)}</b> <CueText line={line} />
-              </span>
-              <span className="age" aria-hidden="true">
-                {formatAge(now - e.at)}
-              </span>
-            </li>
-          ))}
-        </ol>
-      )}
-    </section>
+        <button
+          type="button"
+          className="tool-icon settings-button"
+          aria-haspopup="dialog"
+          aria-expanded={settingsOpen}
+          aria-pressed={settingsOpen}
+          onClick={() => set.setSettingsOpen(!settingsOpen)}
+          title="Settings (,). Press ? for all shortcuts"
+          aria-label="Settings"
+        >
+          <Icon name="settings" />
+        </button>
+      </div>
+    </div>
   );
 }
 
@@ -608,15 +393,14 @@ export function Hud() {
   const connection = useApp((st) => st.connection);
   const connectionError = useApp((st) => st.connectionError);
   const sessions = useApp((st) => st.sessions);
-  const selectedId = useApp((st) => st.selectedId);
   const select = useApp((st) => st.select);
   const assetErrors = useApp((st) => st.assetErrors);
   const compact = useApp((st) => st.compact);
   const collapsed = useApp((st) => st.sessionsCollapsed);
   const list = Object.values(sessions).sort((a, b) => a.startedAt - b.startedAt);
-  const selected = selectedId ? sessions[selectedId] : undefined;
 
-  // Closing the detail panel sends the focus back to the session's row, so keyboard users do not land on <body>.
+  // Closing the session (its close button, Esc) clears the selection, which takes the inspector back to Events, and
+  // sends the focus back to the session's row, so keyboard users do not land on <body>.
   const closeDetail = useCallback(() => {
     const id = useApp.getState().selectedId;
     select(null);
@@ -664,9 +448,10 @@ export function Hud() {
       <Attention list={list} now={now} />
       <NeedAnnouncer list={list} />
       <Toolbar />
+      {/* Before the settings: the settings popover opens over the inspector's top. */}
+      {!compact && <Inspector now={now} onCloseSession={closeDetail} />}
       <SettingsPanel />
-      {selected && !compact && <Detail s={selected} now={now} onClose={closeDetail} />}
-      {!compact && <EventFeed now={now} />}
+      <ShortcutsSheet />
       <Loader />
     </div>
   );

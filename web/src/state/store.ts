@@ -19,6 +19,9 @@ const MAX_CUE_LOG = 40;
 
 export type CameraMode = "orbit" | "cinematic";
 
+/** The right-hand inspector's tabs: the event feed, or the selected session. */
+export type InspectorTab = "events" | "session";
+
 /** Scene parts that load assets; the loading screen lifts once each has mounted (or failed). */
 export const SCENE_PARTS = ["sky", "ground", "walls", "warung", "furniture", "vehicles", "characters"] as const;
 export type ScenePart = (typeof SCENE_PARTS)[number];
@@ -117,8 +120,11 @@ interface AppState {
   /** Rendering light because the window is in the background (set by the frame limiter, not stored). */
   powerSave: boolean;
   setPowerSave(on: boolean): void;
-  /** The event feed folded to its header (per browser). */
+  /** The inspector (event feed and session tabs) folded to its header (per browser). */
   eventsCollapsed: boolean;
+  /** The inspector's open tab (not stored): selecting a session opens "session", clearing it goes back to "events". */
+  inspectorTab: InspectorTab;
+  setInspectorTab(tab: InspectorTab): void;
   /** Needs the user has seen (clicked the character): session id → need.since. Stops the repeating sound only. */
   acknowledged: Record<string, number>;
   setConnection(status: ConnectionStatus, error?: string | null): void;
@@ -168,6 +174,8 @@ export const useApp = create<AppState>((set) => ({
   notificationsEnabled: pref("notifications", true),
   sessionsCollapsed: pref("sessionsCollapsed", false),
   eventsCollapsed: pref("eventsCollapsed", false),
+  inspectorTab: "events",
+  setInspectorTab: (inspectorTab) => set({ inspectorTab }),
   settings: initialSettings,
   updateSettings: (patch) =>
     set((st) => {
@@ -238,10 +246,15 @@ export const useApp = create<AppState>((set) => ({
   select: (selectedId) =>
     set((st) => {
       const need = selectedId ? st.sessions[selectedId]?.need : null;
-      return { selectedId, acknowledged: need && selectedId ? { ...st.acknowledged, [selectedId]: need.since } : st.acknowledged };
+      return {
+        selectedId,
+        // A row, a character, the attention banner or a notification: whatever selects shows the session.
+        inspectorTab: selectedId ? "session" : "events",
+        acknowledged: need && selectedId ? { ...st.acknowledged, [selectedId]: need.since } : st.acknowledged,
+      };
     }),
   setCameraMode: (cameraMode) => set({ cameraMode }),
-  resetView: () => set((st) => ({ viewResets: st.viewResets + 1, selectedId: null, cameraMode: "orbit" })),
+  resetView: () => set((st) => ({ viewResets: st.viewResets + 1, selectedId: null, inspectorTab: "events", cameraMode: "orbit" })),
   setCompact: (compact) => {
     savePref("compact", compact);
     set({ compact });

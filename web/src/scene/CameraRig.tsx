@@ -4,6 +4,7 @@ import { OrbitControls } from "@react-three/drei";
 import { useFrame, useThree } from "@react-three/fiber";
 import { useEffect, useRef, type ComponentRef } from "react";
 import * as THREE from "three";
+import { isTypingTarget } from "../hud/shortcuts.ts";
 import { serverNow, useApp } from "../state/store.ts";
 import { characterRoots } from "./characters/registry.ts";
 import { START, direct, type DirectorState, type Framing } from "./director.ts";
@@ -193,7 +194,8 @@ export function CameraRig({ position, target }: { position: Vec3; target: Vec3 }
       else z.pending = 0;
     };
     const onKey = (e: KeyboardEvent) => {
-      if (e.metaKey || e.ctrlKey || e.altKey || e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
+      // Same rule as the HUD's shortcuts: never while typing (inputs, text areas, selects, editable text).
+      if (e.metaKey || e.ctrlKey || e.altKey || isTypingTarget(e.target)) return;
       if (e.key === "r" || e.key === "R" || e.key === "Home") useApp.getState().resetView();
     };
     el.addEventListener("wheel", onWheel, { passive: false });

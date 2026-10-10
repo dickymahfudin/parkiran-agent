@@ -137,13 +137,18 @@ crickets, engines): between cues the audio context sleeps, so it costs no batter
 need you, work or idle, and the tool and age of every session (MCP tools read as "Claude Browser › javascript_tool";
 sessions of the same project and branch are told apart as `#2`, `#3`). Sessions waiting on you sit at the top; from six
 sessions on each one takes a single line, the panel stops at 58 % of the window and scrolls, the summary chips filter
-the list by state, and the fold button tucks it away down to the summary (remembered per browser). Click a row or a character for details (state,
-tool, calls, how often it asked you and how long it waited for you, its last hour as a strip, and its tool mix); the camera
-follows it, `Esc` lets go). Sessions waiting on you also appear as a banner at the top until they are handled; the event
-feed has an "All / Needs you" filter, marks milestones (100 tool calls, 1 h of work, the 2nd compaction), and folds to
-its header (remembered per browser); folded, the header counts the events that needed you since. The toolbar keeps only
-what you reach for often: orbit / cinematic camera, reset view, a sound mute, the time of day (plus a free time input in
-dev mode) and a gear for the settings. A loading screen covers the lot until
+the list by state, and the fold button tucks it away down to the summary (remembered per browser).
+
+On the right, one **inspector** with two tabs. **Events**: grouped by age ("Just now", "3 min ago", "Earlier"), runs of
+the same event merged into one line with a count ("4 sessions turn done ×4"; what needs you or went wrong is never
+merged), an "All / Needs you" filter, milestones (100 tool calls, 1 h of work, the 2nd compaction). **Session**: click a
+row, a character or the banner and it opens on that session, with four tiles (tool calls, running for, asked you,
+waited for you), its last hour as a strip, its tool mix, and the small facts below; `Esc` or the close button goes back
+to the events and the camera lets go. The inspector is as tall as its content, folds to its header (remembered per
+browser; folded, it counts what needed you since), and on a phone a selected session opens as a sheet at the bottom.
+Sessions waiting on you also appear as a banner at the top until they are handled. The toolbar keeps only what you reach
+for often: orbit / cinematic and reset view, the time of day, the sound mute and the settings. Keys: `R` resets the
+view, `Esc` closes or lets go, `,` opens the settings, `?` lists the keys. A loading screen covers the lot until
 every part of the scene has arrived. States and events use stroke icons (Lucide), no emoji. Plain facts read in English; the warung jokes stay ("cari korek", "batal
 ngerokok", "bawa kopi").
 
@@ -153,7 +158,8 @@ session is handled. System notifications are on by default (the browser asks for
 can be turned off in the settings; the choice is remembered per browser. Clicking the character silences the chime; it never changes the real session. Sound starts after your
 first click on the page (browser rule).
 
-**Settings** (gear in the toolbar; saved per browser, Esc or a click outside closes them):
+**Settings** (gear in the toolbar or `,`; a dialog with the categories on the left, a sheet with a category list on a
+phone; saved per browser; Esc or a click outside closes it; in dev mode a Developer category holds the free scene time):
 
 | Group | Setting | Default |
 |---|---|---|

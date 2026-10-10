@@ -268,3 +268,72 @@ export function unseenAttention(
   for (const e of entries) if (e.seq > seenSeq && ATTENTION_MOODS.has(cueLine(e.cue, sessions[e.cue.sessionId]).mood)) n++;
   return n;
 }
+
+/** How old an event is, as the feed's section heading: "Just now", "1 min ago" … "10 min ago", then "Earlier". */
+export function feedBucket(ageMs: number): string {
+  if (ageMs < 60_000) return "Just now";
+  const m = Math.floor(ageMs / 60_000);
+  return m <= 10 ? `${m} min ago` : "Earlier";
+}
+
+/** One line of the grouped feed: one cue, or a run of alike cues merged into one with a count. */
+export interface FeedGroup {
+  /** The newest cue's `seq`: stable for React and new whenever the line gains a cue. */
+  key: number;
+  line: CueLine;
+  /** Distinct sessions in the run, newest first. */
+  sessionIds: string[];
+  /** How many cues the line stands for. */
+  count: number;
+  /** When the newest of them arrived. */
+  at: number;
+}
+
+export interface FeedSection {
+  label: string;
+  groups: FeedGroup[];
+}
+
+/**
+ * The event feed as people read it: sections by age (`feedBucket`), and inside a section consecutive cues of the
+ * same kind and outcome merged into one line ("4 sessions turn done", "blog turn done ×3"). Cues that need you or went
+ * wrong are never merged: each one matters. `onlyAttention` keeps the "Needs you" lines. `entries` is newest first,
+ * like the store's log. Pure.
+ */
+export function groupFeed(
+  entries: readonly { cue: Cue; at: number; seq: number }[],
+  now: number,
+  sessions: Readonly<Record<string, Pick<PublicSession, "need">>>,
+  onlyAttention = false,
+): FeedSection[] {
+  const sections: FeedSection[] = [];
+  let mergeKey: string | null = null;
+  for (const e of entries) {
+    const line = cueLine(e.cue, sessions[e.cue.sessionId]);
+    const attention = ATTENTION_MOODS.has(line.mood);
+    if (onlyAttention && !attention) continue;
+    const label = feedBucket(now - e.at);
+    let section = sections.at(-1);
+    if (section?.label !== label) {
+      section = { label, groups: [] };
+      sections.push(section);
+      mergeKey = null;
+    }
+    // The text tells outcomes apart (approved / denied, tool / turn failed, a milestone's value).
+    const key = attention ? null : `${e.cue.kind}\u0000${line.text}`;
+    const last = section.groups.at(-1);
+    if (key !== null && key === mergeKey && last) {
+      last.count++;
+      if (!last.sessionIds.includes(e.cue.sessionId)) last.sessionIds.push(e.cue.sessionId);
+    } else {
+      section.groups.push({ key: e.seq, line, sessionIds: [e.cue.sessionId], count: 1, at: e.at });
+    }
+    mergeKey = key;
+  }
+  return sections;
+}
+
+/** Who a feed line is about: the session's name, or "4 sessions" when the line merges several. */
+export function feedSubject(group: Pick<FeedGroup, "sessionIds">, nameOf: (sessionId: string) => string): string {
+  return group.sessionIds.length > 1 ? `${group.sessionIds.length} sessions` : nameOf(group.sessionIds[0] ?? "");
+}
