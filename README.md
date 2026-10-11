@@ -1,9 +1,9 @@
 # Parkiran Agent
 
-A small 3D parking lot beside a warung kopi, live in your browser. Every running Claude Code session (Claude Desktop
-Code tab or the CLI) is a person who walks in from the street, sits down and works on a laptop. What they do mirrors
-the real session: typing while tools run, standing up looking for a lighter when Claude needs your permission,
-walking to the warung for coffee during compaction, dozing off when idle, and leaving when the session ends.
+A small 3D parking lot beside a warung kopi, live in your browser. Every running Claude Code session (the desktop app's
+Code tab or the CLI) is a person who walks in, sits down and works on a laptop, mirroring the real session: typing while
+tools run, standing up for a lighter when Claude needs your permission, a kopi run during compaction, dozing when idle,
+walking away when the session ends.
 
 ![Parkiran Agent at 17:30: one session asks a question, others read, run Bash or fetch a kopi](docs/screenshots/lot-1730.jpg)
 
@@ -17,52 +17,82 @@ walking to the warung for coffee during compaction, dozing off when idle, and le
 Claude Code hooks ──stdin JSON──▶ relay (Bun) ──HTTP POST──▶ server (Bun, 127.0.0.1) ──WebSocket──▶ web (Vite + R3F)
 ```
 
-Everything runs locally. The relay forwards only a few ids and names (see [Privacy](#privacy)); nothing leaves
-your machine.
+Everything runs on your machine; the relay forwards only a few ids and names (see [Privacy](#privacy)).
 
-## Requirements
+## Quick start
 
-- macOS on Apple Silicon (tested), a WebGL2 browser (Chrome, Safari, Firefox).
-- [Bun](https://bun.sh) 1.4 or newer.
-- Claude Code: the Desktop app's Code tab or the `claude` CLI.
-- Only to rebuild the character: Blender 5.2 (`bun run assets:character`).
-
-## Setup
+Needs macOS (tested on Apple Silicon), [Bun](https://bun.sh) 1.4 or newer, a WebGL2 browser (Chrome, Safari, Firefox)
+and Claude Code (the desktop app's Code tab or the `claude` CLI).
 
 ```bash
 git clone https://github.com/dickymahfudin/parkiran-agent.git
 cd parkiran-agent
-bun install                  # installs packages and extracts the 3D assets into web/public/assets
+bun install                  # packages, and the 3D assets unpacked into web/public/assets
 bun run install-hooks        # shows the exact ~/.claude/settings.json diff and asks before writing
 bun run web:build            # builds the web app into web/dist
-bun run server               # http://127.0.0.1:4747
+bun run server               # then open http://127.0.0.1:4747
 ```
 
-Open <http://127.0.0.1:4747>. Running Claude sessions appear on their next hook event (send a prompt). Settings are
-reloaded by Claude Code automatically; no restart needed.
+Running sessions appear on their next hook event (send a prompt); Claude Code picks up the new hooks without a restart.
+`install-hooks` also creates `.env` with a random token and pins the path of your `bun`, so run it again after switching
+Bun versions. `bun run doctor` checks the whole setup.
 
-`install-hooks` also creates `.env` with a random ingest token (mode 600). It adds one async hook per event, pointing
-at `relay/src/index.ts` with the absolute path of your current `bun` binary. If you switch Bun versions (asdf,
-Homebrew), run `bun run install-hooks` again.
+## What you see
 
-### Development
+| Session | Character |
+|---|---|
+| Starts | walks in from the street and takes a free seat; waves at the neighbours |
+| Thinking, running tools | types and smokes; faster for Bash, slower for reading |
+| Needs permission | stands up looking for a lighter; gets a light when you approve |
+| Asks a question | stands up with a "?" bubble |
+| Turn done | stretches; a check badge and a soft "ting" |
+| Tool or turn failed | facepalm, then back to work |
+| Compacting | walks to the warung for a kopi |
+| Subagent | a friend walks in and sits nearby |
+| Idle | shuts the laptop and scrolls the phone; dozes off after 30 min |
+| Ends | closes the laptop and walks away |
 
-```bash
-bun run server               # API + WebSocket on 127.0.0.1:4747 (server:dev restarts on changes)
-bun run web                  # Vite dev server on http://127.0.0.1:4748 (hot reload)
-bun run simulate -- --list                 # scripted sessions, no Claude needed
-bun run simulate -- --port=4757 --scenario=tour   # against a test server (PARKIRAN_PORT=4757 bun run server)
-bun scripts/watch.ts --seconds=120   # prints live state changes and the HUD states seen
-bun test && bun run typecheck && bun run lint   # lint = Biome (biome.json); `bun run lint:fix` applies the safe fixes
-```
+Around them, Pak Joko keeps the warung, a bakso or nasi goreng cart calls in the evening, cars and ojek pass by, and
+the sun and moon follow your clock.
 
-CI (`.github/workflows/ci.yml`) runs install, lint, typecheck, tests and the web build on every push to `main` and every
-pull request, with the Bun version from `.tool-versions`.
+- **HUD:** the session list (what needs you first), a needs-you banner, and an inspector with a grouped event feed and a
+  session view (its last hour, tool mix, how long it waited for you). Keys: `R` reset view, `Esc` close, `,` settings,
+  `?` all keys.
+- **Notifications:** a chime and a system notification when a session needs you; clicking the character silences the
+  chime.
+- **Camera:** drag to orbit, scroll to zoom, click someone to follow; **Cinematic** goes where things happen.
+- **Battery:** Saver by default: 20 fps at most, light rendering, nothing at all in a hidden tab.
+- **Settings** (gear or `,`): sound, notifications, quiet hours, display, battery and street life, saved per browser.
 
-Simulator scenarios: `working`, `approve`, `deny`, `question`, `failure`, `compact`, `subagent`, `idle`, `end`,
-`six` (six busy sessions), `tour` (every state at once). Options: `--speed=2`, `--loop`, `--fresh`. `--port=` is
-required and the simulator refuses the port in `.env` (your live lot, where fake sessions would sit for hours next to
-the real ones) unless you pass `--live`.
+Everything in detail: [docs/GUIDE.md](docs/GUIDE.md).
+
+## Privacy
+
+The relay builds each outgoing message from an allowlist: event name, session id, project name (git repository name, or
+the folder name), branch, tool name, notification type, subagent id and type, tool-use id, a few closed enums (session
+start source, end reason, compaction trigger, failure kind) and timestamps.
+
+Never forwarded or stored: tool inputs and outputs, prompts, file contents, commands, messages, transcripts and full
+paths. The server binds to 127.0.0.1, checks the token, the `Host` header and the WebSocket `Origin`, and makes no
+outbound requests. Nothing reads Claude credentials, OAuth tokens or the Keychain. The optional raw debug log records
+only the shape of events (keys, types, lengths), never values.
+
+## Configuration
+
+`install-hooks` writes `.env` (mode 600, gitignored); every other key is optional. See [.env.example](.env.example).
+
+| Key | Default | Meaning |
+|---|---|---|
+| `PARKIRAN_TOKEN` | random | shared secret between relay and server (written by `install-hooks`) |
+| `PARKIRAN_PORT` | `4747` | server port (127.0.0.1 only) |
+| `PARKIRAN_GIT` | written by `install-hooks` | absolute path of `git`, used only for repositories in the reftable format; unset, their branch stays empty |
+| `PARKIRAN_WEB_PORT` | `4748` | Vite dev server port |
+| `PARKIRAN_LAT`, `PARKIRAN_LON` | `-6.2`, `106.8` | where the lot is, for the sun (Jakarta); the clock always reads your local time |
+| `PARKIRAN_IDLE_MINUTES` | `30` | idle time before a character dozes off |
+| `PARKIRAN_REAP_HOURS` | `12` | sessions without events leave after this |
+| `PARKIRAN_ALLOWED_ORIGINS` | – | extra WebSocket origins, comma separated |
+| `PARKIRAN_STATIC_DIR` | `web/dist` | what the server serves at `/` |
+| `PARKIRAN_RELAY_DEBUG`, `PARKIRAN_RELAY_RAW` | `0` | relay error log / shape-only raw event log in `logs/` |
 
 ## Uninstall
 
@@ -70,183 +100,38 @@ the real ones) unless you pass `--live`.
 bun run uninstall-hooks      # shows the diff, asks, removes only Parkiran's handlers
 ```
 
-Before every write or delete, the current `settings.json` is copied to `.parkiran/settings.json.<timestamp>.bak`
-(mode 600, the last 10 kept). The file ends up byte for byte as it was before `install-hooks` (containers the installer created are removed too;
-the manifest is in `.parkiran/hooks-install.json`). If the file is not in standard JSON formatting, install refuses
-unless you pass `--allow-reformat`. Both scripts accept `--dry-run` and `--settings=<path>`.
-
-## What you see
-
-| Session | Character |
-|---|---|
-| Session starts | walks in from the street along the gang, straight to a bench, stool or car hood, opens the laptop; waves at whoever sits next to it (they wave back) |
-| `thinking` | types with one hand, smokes with the other; when the tools start, the cigarette goes to the lips |
-| Working (`reading`, `bash`, `editing`, `browsing`, `subagent`) | types; slower for reading, faster for Bash |
-| Needs permission (`permission`) | stands up with an unlit cigarette, pats pockets, looks around; lighter bubble |
-| Permission approved | gets a light, first drag, sits back down |
-| Permission denied (inferred, Claude sends no event) | sighs, pockets the cigarette, sits back down |
-| Question / input (`question`, `needs input`) | stands up with a "?" bubble |
-| Turn done | leans back for a stretch, a check badge pops up over the head, a soft "ting" |
-| Turn ended unseen (Esc, a crash or a closed lid fire no hook) | after 15 min without an event, no tool running and no friend out, goes idle quietly (no ting); the quiet minutes never count as work |
-| `idle` | shuts the laptop, lights a cigarette and scrolls the phone, with the odd drag; two idle neighbours now and then turn to each other for a chat |
-| Tool or turn failure (`error`) | facepalm, then back to work |
-| `compacting` | buys a kopi at the warung window, drinks it on a free warung stool (or back on its own seat) with the kopi in one hand and the kretek or vape in the other, walks back when done |
-| Subagent | a friend walks in and sits next to the parent (or on any free seat), leaves when done |
-| Idle for 30 min (`dozing`) | laptop shut, dozes off, Zzz |
-| Session ends (`leaving`) | stubs out the cigarette, closes the laptop, walks away |
-
-Not everyone smokes kretek: about 70 % do, a quarter vape (the pod held upright in a closed fist, brought to the lips; no
-lighter; the LED glows on a pull and they blow thick white clouds) and 5 % do not smoke at all (they type while thinking and sip a kopi over the phone when idle). The
-table above is the kretek smoker's version; a vaper or a non-smoker asked for permission gets a key bubble instead of
-the lighter and sits back down without lighting up.
-
-About one person in ten wears a black peci and three in ten glasses, picked per session (a cap, one in five, never
-goes over a peci). By each seat a tin ashtray fills up with butts as the session ages (one per 15
-minutes) and an empty kopi glass stays behind after every compaction, so you can tell an old session from a new one
-without the HUD.
-
-**Pak Joko** keeps the warung: behind his counter he smokes, sips, scrolls his phone and looks around, hands the kopi
-over when someone comes to buy, and naps on his stool from 23:00 to 04:30. From 17:00 to 01:00 a bakso or nasi goreng vendor calls at the lot every 5 minutes: he pushes the cart in
-along the footpath, stops by the lot's west edge for 45 s with his "ting-ting" or "tek-tek", backs out to the mouth of
-the gang, turns round and leaves (off, evenings or all day in the settings).
-
-When every seat is taken, newcomers and friends stand at their own spot (clear of the sitters, the cars and the
-walking lanes, never inside each other) and sit down as soon as a seat frees up.
-
-The scene follows your local clock: the sun and moon are computed from latitude/longitude, lamps and the warung light
-up at dusk, moths circle the street lamp at night. Cars and ojek riders pass by, and a kucing oren naps around the lot.
-The warung's side wall carries a spray-painted "NGOPI dulu!" piece with a kopi cup and its kretek, a korek gas and the
-writer's "dism" tag (drawn in code, weathered into the plaster, with the cans left at its foot) under a tin-shade lamp that lights it at night; warm festoon bulbs hang from the awning
-over the benches and red-white bunting runs along the back wall.
-
-**Camera:** the default view is framed on the benches, the gerobak and the warung. Drag to orbit, scroll to zoom towards whatever is under the mouse, right up to a person's face (scrolling
-back out returns to the overview), click a character to follow it. **Reset view** in the toolbar, the `R` key or a double-click on empty ground brings back the
-default angle. **Cinematic** is a director: it goes where things happen (a close-up of whoever needs you, a medium shot
-of a finished turn or a failure, following a newcomer or a coffee run), holds every shot at least 6 s, and drifts over
-the lot in between, now and then visiting someone at work.
-
-**Street:** cars and ojek share each lane single file and keep a safe gap to whoever is ahead.
-
-**Performance and battery:** by default (Saver) the lot renders at most 20 fps, 15 when it is quiet and 10 with
-another window in front, always light (resolution 1, no ambient occlusion), and nothing at all in a hidden tab. Balanced
-(settings) gives 60 fps while the view moves (evenly paced on 120 Hz screens), 30 while you watch sessions work, 20 on a
-quiet lot and 15 behind other windows, and renders light only after 3 s in the background. Resolution drops in three
-steps (1.5 → 1.25 → 1) when frames run slow, and every shader is compiled up front so props never stall a frame when they
-first appear. About 570 draw calls and 650k triangles a frame with six people in the lot.
-
-**Sound:** procedural cues, no audio files: the chime when a session needs you, a soft "ting" when a turn is done, the
-lighter, and the food carts' "ting-ting" / "tek-tek" as they pass. There is no background ambience (street, keyboards,
-crickets, engines): between cues the audio context sleeps, so it costs no battery and does not keep the Mac awake.
-
-**Time of day:** the scene clock in the toolbar is also a menu: **Auto** follows your clock, **Pagi** (07:00), **Siang**
-(12:00), **Sore** (17:30) and **Malam** (21:00) hold the lot at that time. Switching eases the sun round the clock in
-1.5 s; the choice is remembered in this browser (`?time=` still wins).
-
-**HUD:** the session list shows each character's shirt colour next to the project, a summary of how many sessions
-need you, work or idle, and the tool and age of every session (MCP tools read as "Claude Browser › javascript_tool";
-sessions of the same project and branch are told apart as `#2`, `#3`). Sessions waiting on you sit at the top; from six
-sessions on each one takes a single line, the panel stops at 58 % of the window and scrolls, the summary chips filter
-the list by state, and the fold button tucks it away down to the summary (remembered per browser).
-
-On the right, one **inspector** with two tabs. **Events**: grouped by age ("Just now", "3 min ago", "Earlier"), runs of
-the same event merged into one line with a count ("4 sessions turn done ×4"; what needs you or went wrong is never
-merged), an "All / Needs you" filter, milestones (100 tool calls, 1 h of work, the 2nd compaction). **Session**: click a
-row, a character or the banner and it opens on that session, with four tiles (tool calls, running for, asked you,
-waited for you), its last hour as a strip, its tool mix, and the small facts below; `Esc` or the close button goes back
-to the events and the camera lets go. The inspector is as tall as its content, folds to its header (remembered per
-browser; folded, it counts what needed you since), and on a phone a selected session opens as a sheet at the bottom
-(what needs you then moves to the top):
-
-<img src="docs/screenshots/phone.jpg" alt="Phone layout: the needs-you banner, the session list and a session as a sheet" width="260">
-
-Sessions waiting on you also appear as a banner at the top until they are handled. The toolbar keeps only what you reach
-for often: orbit / cinematic and reset view, the time of day, the sound mute and the settings. Keys: `R` resets the
-view, `Esc` closes or lets go, `,` opens the settings, `?` lists the keys. A loading screen covers the lot until
-every part of the scene has arrived. States and events use stroke icons (Lucide), no emoji. Plain facts read in English; the warung jokes stay ("cari korek", "batal
-ngerokok", "bawa kopi").
-
-**Notifications:** when a session needs you, a chime plays (and repeats every 25 s); when the page is not focused you
-also get a system notification such as "warung-app needs permission" with the branch, which disappears as soon as the
-session is handled. System notifications are on by default (the browser asks for permission on your first click) and
-can be turned off in the settings; the choice is remembered per browser. Clicking the character silences the chime; it never changes the real session. Sound starts after your
-first click on the page (browser rule).
-
-**Settings** (gear in the toolbar or `,`; a dialog with the categories on the left, a sheet with a category list on a
-phone; saved per browser; Esc or a click outside closes it; in dev mode a Developer category holds the free scene time):
-
-| Group | Setting | Default |
-|---|---|---|
-| Sound | All sounds (also the toolbar's speaker); volume (let go of the slider to hear the chime); one by one: needs-you chime, turn-done ting, lighter, food carts | on; 100 %; all on |
-| Notifications | System notifications when the page is not in front; chime repeats every 25 s / every minute / once; quiet hours (no chime in a window you pick, the banner and system notifications still come) | on; 25 s; off (22:00–07:00 when on) |
-| Display | Compact mode for a second monitor (`?compact` still forces it); name tags off / name / full (need bubbles always show); smoking: mixed / nobody / vapes only (Pak Joko and the ashtrays too); start in cinematic; the event feed's starting filter | off; full; mixed; off; All |
-| Battery | Saver (20 fps at most, always light) / Balanced (60 moving, 30 watching, 15 behind) / Smooth (60 nearly always) | Saver |
-| Street life | Food carts: off / evenings (17:00–01:00) / all day; traffic (cars and ojek) on or off | evenings; on |
-
-URL options: `?time=21:00` (fixed scene time), `?compact`, `?cinematic`, `?stats` (frame-rate meter); in dev mode also
-`?cam=px,py,pz,tx,ty,tz`, `?cart=bakso|nasgor` (a cart right now) and `?gallery`.
-
-## Configuration (`.env`)
-
-| Key | Default | Meaning |
-|---|---|---|
-| `PARKIRAN_TOKEN` | random | shared secret between relay and server (created by `install-hooks`) |
-| `PARKIRAN_PORT` | `4747` | server port (127.0.0.1 only) |
-| `PARKIRAN_WEB_PORT` | `4748` | Vite dev server port |
-| `PARKIRAN_LAT`, `PARKIRAN_LON` | `-6.2`, `106.8` | where the lot is, for the sun (Jakarta). The lot's clock always reads your local time, wherever you watch from |
-| `PARKIRAN_IDLE_MINUTES` | `30` | idle time before a character dozes off |
-| `PARKIRAN_REAP_HOURS` | `12` | sessions without events disappear after this |
-| `PARKIRAN_ALLOWED_ORIGINS` | – | extra WebSocket origins, comma separated |
-| `PARKIRAN_STATIC_DIR` | `web/dist` | what the server serves at `/` |
-| `PARKIRAN_GIT` | `git` on PATH | git binary, only used for reftable repositories |
-| `PARKIRAN_RELAY_DEBUG`, `PARKIRAN_RELAY_RAW` | `0` | relay debug log / shape-only raw event log in `logs/` |
-
-## Privacy
-
-The relay builds each outgoing message from an allowlist: event name, session id, project name (git repository
-name, or the folder name), branch, tool name, notification type, subagent id/type, tool-use id, a few closed enums
-(session start source, end reason, compaction trigger, failure kind) and timestamps.
-
-Never forwarded or stored: tool inputs and outputs, prompts, file contents, commands, messages, transcripts and full
-paths. The server binds to 127.0.0.1, checks the token, the `Host` header and the WebSocket `Origin`, and makes no
-outbound requests. Nothing reads Claude credentials, OAuth tokens or the Keychain. The optional raw debug log
-records only the shape of events (keys, types, lengths), never values.
-
-## Assets
-
-The optimised models, textures, skies and the animated character are committed as one archive
-(`assets/parkiran-assets.tar.gz`, checksums in `assets/parkiran-assets.json`) and extracted on `bun install`.
-To rebuild them from their sources:
-
-```bash
-bun run assets               # Poly Haven models, textures and skies (downloads, then repacks the archive)
-bun run assets:character     # MakeHuman/MPFB character + Quaternius/keyframed clips in Blender (BLENDER=/path)
-```
-
-Sources and licences: [CREDITS.md](CREDITS.md). How it works: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md); what Claude
-Code really sends: [docs/EXPERIMENTS.md](docs/EXPERIMENTS.md); what could come next: [docs/ROADMAP.md](docs/ROADMAP.md);
-changes: [CHANGELOG.md](CHANGELOG.md).
-
-## Layout
-
-```
-shared/   event schema + validators, session reducer, seats, sun position (used by server, simulator, tests)
-relay/    hook entrypoint: stdin → allowlist → POST, ~14 ms per run, never blocks Claude (async hooks)
-server/   Bun.serve: POST /ingest, WebSocket /ws, static web/dist
-web/      Vite + React Three Fiber scene, HUD, audio, notifications
-scripts/  install/uninstall hooks, simulator, asset pipeline, Blender scripts
-assets/   asset archive (+ raw downloads and Blender output, gitignored)
-```
+`settings.json` ends up byte for byte as it was before `install-hooks`, and a backup is kept in `.parkiran/` before every
+write. If the file is not in standard JSON formatting, install refuses unless you pass `--allow-reformat`. Details:
+[docs/GUIDE.md](docs/GUIDE.md#install-and-uninstall-in-detail).
 
 ## Troubleshooting
 
-- **Not sure what is wrong:** `bun run doctor` checks `settings.json`, the pinned bun/relay paths, `.env`, the install
-  manifest, the server (`/api/health`) and the web build, one `ok`/`warn`/`fail` line each (exit 1 only on `fail`).
+- **Not sure what is wrong:** `bun run doctor` checks `settings.json`, the pinned bun and relay paths, `.env`, the install
+  manifest, the server (`/api/health`) and the web build, one `ok` / `warn` / `fail` line each.
 - **Nobody shows up:** check the HUD shows *live*; send a prompt in Claude (sessions appear on their next event);
   `PARKIRAN_RELAY_DEBUG=1` in `.env` writes relay errors to `logs/`.
 - **"asset failed to load" in the HUD:** run `bun install` again (re-extracts the archive).
-- **Hooks stopped after a Bun upgrade:** `bun run install-hooks` again (the hook pins the bun binary path).
+- **Hooks stopped after a Bun upgrade:** run `bun run install-hooks` again (the hook pins the bun binary path).
 - **No notifications:** allow notifications for 127.0.0.1 in the browser, then turn on **System notifications** in the
-  settings (gear in the toolbar).
+  settings.
+
+## Development
+
+```bash
+bun run web                                       # Vite dev server on http://127.0.0.1:4748 (hot reload)
+bun run simulate -- --port=4757 --scenario=tour   # scripted sessions against a test server, no Claude needed
+bun test && bun run typecheck && bun run lint
+```
+
+The simulator, the test server and CI: [docs/GUIDE.md](docs/GUIDE.md#development).
+
+## Docs
+
+- [docs/GUIDE.md](docs/GUIDE.md): everything the lot does, settings, development, assets
+- [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md): how it works
+- [docs/EXPERIMENTS.md](docs/EXPERIMENTS.md): what Claude Code hooks really send
+- [docs/ROADMAP.md](docs/ROADMAP.md): what could come next
+- [CHANGELOG.md](CHANGELOG.md) and [CREDITS.md](CREDITS.md) (asset sources and licences)
 
 ## License
 

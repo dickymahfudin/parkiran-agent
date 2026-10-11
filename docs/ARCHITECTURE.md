@@ -46,7 +46,7 @@ parkiran-agent/
 ├─ web/        Vite + React + R3F + drei + postprocessing + zustand; scene/, hud/, audio/, state/
 ├─ scripts/    install-hooks, uninstall-hooks, simulate, watch, bench-relay, assets/ pipeline, blender/ character + clips
 ├─ assets/     parkiran-assets.tar.gz + checksums (committed); raw/ and generated/ (gitignored)
-├─ docs/       ARCHITECTURE.md, EXPERIMENTS.md, ROADMAP.md, screenshots/
+├─ docs/       GUIDE.md, ARCHITECTURE.md, EXPERIMENTS.md, ROADMAP.md, screenshots/
 ├─ .env        PARKIRAN_TOKEN / PORT / … created by install-hooks, mode 600, gitignored
 └─ .parkiran/  install manifest + last dry-run diff, gitignored
 ```
