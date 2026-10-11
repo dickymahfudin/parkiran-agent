@@ -2,7 +2,7 @@
 // Usage: bun run simulate -- --port=4757 [--scenario=tour|<name>] [--speed=1] [--loop] [--fresh] [--list]
 // The port must be given, and it refuses the port in .env (the live lot with your real sessions) unless --live is passed.
 // Doze needs a short idle timeout on the server: PARKIRAN_IDLE_MINUTES=0.3 PARKIRAN_PORT=4757 bun run server
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { DEFAULT_PORT, parseEnvFile } from "../shared/src/env.ts";
 import type { HookEventName, IngestEvent } from "../shared/src/events.ts";
@@ -22,9 +22,11 @@ if (!Number.isFinite(speed) || speed <= 0) {
   process.exit(1);
 }
 
-const env = parseEnvFile(readFileSync(join(REPO_ROOT, ".env"), "utf8"));
+// A fresh clone has no .env until `bun run install-hooks`: --list and the port checks work without it; only sending
+// events needs the token (checked right before the run).
+const envPath = join(REPO_ROOT, ".env");
+const env = existsSync(envPath) ? parseEnvFile(readFileSync(envPath, "utf8")) : {};
 const token = process.env.PARKIRAN_TOKEN ?? env.PARKIRAN_TOKEN;
-if (!token) throw new Error("PARKIRAN_TOKEN missing in .env (run `bun run install-hooks`)");
 
 /** The port the hooks post to: the live lot. Simulated sessions there sit next to your real ones for hours. */
 const livePort = Number(env.PARKIRAN_PORT ?? DEFAULT_PORT);
@@ -330,6 +332,10 @@ const name = args.get("scenario") ?? "tour";
 const scenario = scenarios[name];
 if (!scenario) {
   console.error(`unknown scenario "${name}". Try --list`);
+  process.exit(1);
+}
+if (!token) {
+  console.error("PARKIRAN_TOKEN missing: run `bun run install-hooks` (it creates .env) or set PARKIRAN_TOKEN");
   process.exit(1);
 }
 console.log(`simulating "${name}" at ${speed}x against 127.0.0.1:${port}${loop ? " (looping)" : ""}`);
