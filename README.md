@@ -135,4 +135,4 @@ The simulator, the test server and CI: [docs/GUIDE.md](docs/GUIDE.md#development
 
 ## License
 
-MIT
+Code: MIT. Third-party assets keep their own licences, see [CREDITS.md](CREDITS.md).

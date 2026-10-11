@@ -3,6 +3,18 @@
 Every third-party asset used by Parkiran Agent, with its source and licence. Raw downloads live in `assets/raw/`
 (gitignored); processed outputs go to `web/public/assets/` and ship in `assets/parkiran-assets.tar.gz`.
 
+The project's own code is MIT ([LICENSE](LICENSE)). The assets below keep their own licences and are not relicensed:
+
+- **CC0** ([Public Domain Dedication](https://creativecommons.org/publicdomain/zero/1.0/)): no conditions; credited
+  here anyway.
+- **CC BY** ([Creative Commons Attribution](https://creativecommons.org/licenses/by/4.0/)): free to use, change and share
+  as long as the author is credited, the source is linked and changes are noted, as in the rows below. The two asset
+  pages say "CC-BY - Creative Commons Attribution" without a version; 4.0 is the current one.
+- **MIT**, **ISC**, **OFL-1.1** ([SIL Open Font License](https://openfontlicense.org)): libraries and the font, installed
+  from npm with their licence files.
+- **GPL-3.0-or-later**: MPFB, a Blender tool used to build the character; it is not redistributed, and what it
+  produces is not covered by its licence.
+
 ## Character (built with MPFB, `scripts/blender/make_character.py`)
 
 | Asset | Author | Source | Licence |
@@ -12,8 +24,8 @@ Every third-party asset used by Parkiran Agent, with its source and licence. Raw
 | `toigo_basic_tucked_t-shirt` (lengthened, retextured grey) | MargaretToigo | http://www.makehumancommunity.org/node/1203 | CC0 |
 | `namuhekam_male_polo_shirt` (retextured grey) | namuhekam | http://www.makehumancommunity.org/node/2909 | CC0 |
 | `cortu_cargo_pants` (retextured grey) | Cortu | http://www.makehumancommunity.org/node/2798 | CC0 |
-| `elvs_male_swim_shorts1` (texture replaced by plain fabric) | Elvaerwyn | http://www.makehumancommunity.org/node/1321 | CC-BY |
-| `mindfront_male_swimming_trunks_01` (retextured grey) | Mindfront | http://www.makehumancommunity.org/node/329 | CC-BY 4.0 |
+| `elvs_male_swim_shorts1` (texture replaced by plain fabric) | Elvaerwyn | http://www.makehumancommunity.org/node/1321 | CC BY |
+| `mindfront_male_swimming_trunks_01` (retextured grey) | Mindfront | http://www.makehumancommunity.org/node/329 | CC BY |
 
 ## Animation
 
