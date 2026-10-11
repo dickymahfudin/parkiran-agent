@@ -1,5 +1,5 @@
 // Head accessories, picked per session (`accessoryFor`): a peci or glasses. Procedural, a few draws each, placed on the
-// head anchor by Person. No cloth on the people (user's choice).
+// head anchor by Person. No cloth on the people, by design.
 import * as THREE from "three";
 import type { Accessory } from "./identity.ts";
 

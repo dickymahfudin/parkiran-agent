@@ -51,4 +51,4 @@ session of the user in another repo.
 - Tee, polo and cargo pants have no `delete_verts`, so skin coverage is computed by ray casting along vertex
   normals (6 cm) and eroding one ring.
 - Seated typing pose rendered in Blender (`scripts/blender/render_pose_test.py`): clothes follow thighs/torso/arms,
-  no visible skin poke-through. Render: `docs/screenshots/character-preview.png` (the pose test was superseded by `clips-blender-*.jpg`).
+  no visible skin poke-through (the pose test was later superseded by Blender renders of every clip).

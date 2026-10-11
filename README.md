@@ -5,7 +5,13 @@ Code tab or the CLI) is a person who walks in from the street, sits down and wor
 the real session: typing while tools run, standing up looking for a lighter when Claude needs your permission,
 walking to the warung for coffee during compaction, dozing off when idle, and leaving when the session ends.
 
-![Parkiran Agent at 17:30](docs/screenshots/final-1730.jpg)
+![Parkiran Agent at 17:30: one session asks a question, others read, run Bash or fetch a kopi](docs/screenshots/lot-1730.jpg)
+
+<p>
+  <img src="docs/screenshots/lot-night.jpg" alt="The lot at 21:00: two sessions wait for permission" width="290">
+  <img src="docs/screenshots/inspector.jpg" alt="A session in the inspector: tool calls, running time, its last hour and tool mix" width="290">
+  <img src="docs/screenshots/settings.jpg" alt="The settings dialog, Notifications category" width="290">
+</p>
 
 ```
 Claude Code hooks ──stdin JSON──▶ relay (Bun) ──HTTP POST──▶ server (Bun, 127.0.0.1) ──WebSocket──▶ web (Vite + R3F)
@@ -24,6 +30,8 @@ your machine.
 ## Setup
 
 ```bash
+git clone https://github.com/dickymahfudin/parkiran-agent.git
+cd parkiran-agent
 bun install                  # installs packages and extracts the 3D assets into web/public/assets
 bun run install-hooks        # shows the exact ~/.claude/settings.json diff and asks before writing
 bun run web:build            # builds the web app into web/dist
@@ -146,7 +154,11 @@ merged), an "All / Needs you" filter, milestones (100 tool calls, 1 h of work, t
 row, a character or the banner and it opens on that session, with four tiles (tool calls, running for, asked you,
 waited for you), its last hour as a strip, its tool mix, and the small facts below; `Esc` or the close button goes back
 to the events and the camera lets go. The inspector is as tall as its content, folds to its header (remembered per
-browser; folded, it counts what needed you since), and on a phone a selected session opens as a sheet at the bottom.
+browser; folded, it counts what needed you since), and on a phone a selected session opens as a sheet at the bottom
+(what needs you then moves to the top):
+
+<img src="docs/screenshots/phone.jpg" alt="Phone layout: the needs-you banner, the session list and a session as a sheet" width="260">
+
 Sessions waiting on you also appear as a banner at the top until they are handled. The toolbar keeps only what you reach
 for often: orbit / cinematic and reset view, the time of day, the sound mute and the settings. Keys: `R` resets the
 view, `Esc` closes or lets go, `,` opens the settings, `?` lists the keys. A loading screen covers the lot until
@@ -210,8 +222,9 @@ bun run assets               # Poly Haven models, textures and skies (downloads,
 bun run assets:character     # MakeHuman/MPFB character + Quaternius/keyframed clips in Blender (BLENDER=/path)
 ```
 
-Sources and licences: [CREDITS.md](CREDITS.md). How it works: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md); what comes next:
-[docs/ROADMAP.md](docs/ROADMAP.md); progress and decisions: [PROGRESS.md](PROGRESS.md).
+Sources and licences: [CREDITS.md](CREDITS.md). How it works: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md); what Claude
+Code really sends: [docs/EXPERIMENTS.md](docs/EXPERIMENTS.md); what could come next: [docs/ROADMAP.md](docs/ROADMAP.md);
+changes: [CHANGELOG.md](CHANGELOG.md).
 
 ## Layout
 

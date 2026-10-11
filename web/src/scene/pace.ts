@@ -27,7 +27,7 @@ export interface PaceInput {
 
 /** Frame rates per battery setting. Saver is the default (20 at most); Balanced was measured; Smooth never drops low. */
 export const RATES: Readonly<Record<PowerMode, { active: number; watch: number; quiet: number; background: number }>> = {
-  // The default (user's choice): never above 20, even while the camera moves.
+  // The default: never above 20, even while the camera moves.
   saver: { active: 20, watch: 20, quiet: 15, background: 10 },
   balanced: { active: ACTIVE_FPS, watch: WATCH_FPS, quiet: QUIET_FPS, background: BACKGROUND_FPS },
   smooth: { active: 60, watch: 60, quiet: 30, background: 30 },

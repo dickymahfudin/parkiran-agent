@@ -1,8 +1,8 @@
 # Parkiran Agent: architecture
 
 How the system works today. It replaces the Phase 0 plan (`docs/PLAN.md`; its history is in git). Evidence for the
-Claude Code behaviour is in [EXPERIMENTS.md](EXPERIMENTS.md), the build log in [PROGRESS.md](../PROGRESS.md), and
-what comes next in [ROADMAP.md](ROADMAP.md).
+Claude Code behaviour is in [EXPERIMENTS.md](EXPERIMENTS.md), the changes in [CHANGELOG.md](../CHANGELOG.md), and
+what could come next in [ROADMAP.md](ROADMAP.md).
 
 A browser scene of a parking lot beside a warung kopi. Every running Claude Code session is a person who walks in,
 sits down with a laptop and mirrors the real session state, driven by Claude Code hooks.

@@ -5,7 +5,7 @@ import type { CartMode } from "../scene/art/foodCart.ts";
 
 /** When the food-cart vendor comes by (defined with the cart's schedule). */
 export type { CartMode };
-/** How hard the scene works for smoothness. Saver is the default (user's choice); see PROGRESS.md, battery rounds. */
+/** How hard the scene works for smoothness. Saver, the default, never goes above 20 fps. */
 export type PowerMode = "saver" | "balanced" | "smooth";
 /** The sounds that can be turned off one by one (the master switch is the toolbar's sound button). */
 export type SoundCue = "needsYou" | "turnDone" | "lighter" | "cart";

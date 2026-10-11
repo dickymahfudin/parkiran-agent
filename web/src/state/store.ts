@@ -176,7 +176,7 @@ export const useApp = create<AppState>((set) => ({
   compact: params.has("compact") || pref("compact", false),
   audioEnabled: pref("audio", true),
   audioUnlocked: false,
-  // On by default (user's choice): the browser's permission prompt comes with the first click on the page.
+  // On by default: the browser's permission prompt comes with the first click on the page.
   notificationsEnabled: pref("notifications", true),
   sessionsCollapsed: pref("sessionsCollapsed", false),
   eventsCollapsed: pref("eventsCollapsed", false),
