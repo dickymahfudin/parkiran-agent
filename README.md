@@ -79,6 +79,7 @@ unless you pass `--allow-reformat`. Both scripts accept `--dry-run` and `--setti
 | Permission denied (inferred, Claude sends no event) | sighs, pockets the cigarette, sits back down |
 | Question / input (`question`, `needs input`) | stands up with a "?" bubble |
 | Turn done | leans back for a stretch, a check badge pops up over the head, a soft "ting" |
+| Turn ended unseen (Esc, a crash or a closed lid fire no hook) | after 15 min without an event, no tool running and no friend out, goes idle quietly (no ting); the quiet minutes never count as work |
 | `idle` | shuts the laptop, lights a cigarette and scrolls the phone, with the odd drag; two idle neighbours now and then turn to each other for a chat |
 | Tool or turn failure (`error`) | facepalm, then back to work |
 | `compacting` | buys a kopi at the warung window, drinks it on a free warung stool (or back on its own seat) with the kopi in one hand and the kretek or vape in the other, walks back when done |

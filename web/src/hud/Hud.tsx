@@ -3,7 +3,7 @@ import type { PublicSession } from "../../../shared/src/protocol.ts";
 import { TIME_PRESETS, modeOf, type TimeMode } from "../scene/env/timeOfDay.ts";
 import { SCENE_PARTS, serverNow, useApp } from "../state/store.ts";
 import { Icon, ParkingMark } from "./icons.tsx";
-import { Inspector } from "./Inspector.tsx";
+import { Inspector, PHONE_QUERY } from "./Inspector.tsx";
 import { SettingsPanel } from "./SettingsPanel.tsx";
 import { ShortcutsSheet } from "./ShortcutsSheet.tsx";
 import {
@@ -110,13 +110,19 @@ function SessionList({ list, now, compact }: { list: PublicSession[]; now: numbe
   useEffect(() => {
     if (selectedId) document.querySelector(`[data-session="${CSS.escape(selectedId)}"]`)?.scrollIntoView({ block: "nearest", behavior: "smooth" });
   }, [selectedId]);
+  // A second click on the selected row closes its session, but only while the session shows: from the Events tab it
+  // brings the session back up instead (a phone always shows it).
+  const toggle = (id: string) => {
+    const showing = useApp.getState().inspectorTab === "session" || matchMedia(PHONE_QUERY).matches;
+    select(id === selectedId && showing ? null : id);
+  };
   return (
     <>
       {!compact && <Summary list={list} now={now} filter={filter} onFilter={setFilter} />}
       {!collapsed && (
         <div className="session-list">
           {shown.map((s) => (
-            <SessionRow key={s.id} s={s} now={now} selected={s.id === selectedId} onSelect={() => select(s.id === selectedId ? null : s.id)} />
+            <SessionRow key={s.id} s={s} now={now} selected={s.id === selectedId} onSelect={() => toggle(s.id)} />
           ))}
         </div>
       )}

@@ -137,4 +137,26 @@ describe("the inspector's tab", () => {
     useApp.getState().setInspectorTab("session");
     expect(useApp.getState().inspectorTab).toBe("session");
   });
+
+  test("the selected session ending, or missing after a reconnect, takes the inspector back to Events", () => {
+    useApp.getState().apply(hello([session("a"), session("b")]));
+    useApp.getState().select("a");
+    useApp.getState().apply({ type: "sessions", serverTime: Date.now(), updated: [], removed: ["b"] });
+    expect(useApp.getState().inspectorTab).toBe("session");
+    useApp.getState().apply({ type: "sessions", serverTime: Date.now(), updated: [], removed: ["a"] });
+    expect([useApp.getState().selectedId, useApp.getState().inspectorTab]).toEqual([null, "events"]);
+
+    useApp.getState().apply(hello([session("a"), session("b")]));
+    useApp.getState().select("b");
+    useApp.getState().apply(hello([session("a")]));
+    expect([useApp.getState().selectedId, useApp.getState().inspectorTab]).toEqual([null, "events"]);
+  });
+
+  test("a Session tab picked with nothing selected stays through updates", () => {
+    useApp.getState().apply(hello([session("a")]));
+    useApp.getState().select(null);
+    useApp.getState().setInspectorTab("session");
+    useApp.getState().apply({ type: "sessions", serverTime: Date.now(), updated: [], removed: ["a"] });
+    expect(useApp.getState().inspectorTab).toBe("session");
+  });
 });

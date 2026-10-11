@@ -215,6 +215,7 @@ function SettingsDialog({
                     type="button"
                     data-category={c.id}
                     className={c.id === category ? "current" : undefined}
+                    aria-current={c.id === category ? "true" : undefined}
                     onClick={() => {
                       onCategory(c.id);
                       onPhoneView("detail");

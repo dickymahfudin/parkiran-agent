@@ -30,6 +30,8 @@ export function ShortcutsSheet() {
       if (!which) return;
       e.preventDefault();
       if (which === "help") {
+        // Behind the modal settings dialog the sheet would open under its backdrop and outlive it.
+        if (useApp.getState().settingsOpen) return;
         if (openRef.current) closeRef.current(true);
         else {
           back.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
@@ -53,25 +55,25 @@ export function ShortcutsSheet() {
     root.current?.querySelector<HTMLElement>("button")?.focus();
     // A click elsewhere closes it; the focus stays where that click put it.
     const away = (e: PointerEvent) => !root.current?.contains(e.target as Node) && closeRef.current(false);
+    // Esc closes the sheet wherever the focus is (also after tabbing out of it), and only the sheet: capture on window
+    // runs before the HUD's own Esc, which would close the selected session behind it.
+    const esc = (e: KeyboardEvent) => {
+      if (e.key !== "Escape") return;
+      e.preventDefault();
+      e.stopPropagation();
+      closeRef.current(!!root.current?.contains(document.activeElement));
+    };
     window.addEventListener("pointerdown", away);
-    return () => window.removeEventListener("pointerdown", away);
+    window.addEventListener("keydown", esc, true);
+    return () => {
+      window.removeEventListener("pointerdown", away);
+      window.removeEventListener("keydown", esc, true);
+    };
   }, [open]);
 
   if (!open) return null;
   return (
-    <div
-      ref={root}
-      className="panel shortcuts-sheet"
-      role="dialog"
-      aria-labelledby="shortcuts-title"
-      onKeyDown={(e) => {
-        if (e.key === "Escape") {
-          // Esc here closes the sheet only, not the selected session behind it.
-          e.stopPropagation();
-          close(true);
-        }
-      }}
-    >
+    <div ref={root} className="panel shortcuts-sheet" role="dialog" aria-labelledby="shortcuts-title">
       <header>
         <h2 id="shortcuts-title">Keyboard shortcuts</h2>
         <button type="button" className="icon-button" onClick={() => close(true)} aria-label="Close shortcuts" title="Close (Esc)">

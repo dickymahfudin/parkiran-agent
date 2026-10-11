@@ -194,8 +194,10 @@ export function CameraRig({ position, target }: { position: Vec3; target: Vec3 }
       else z.pending = 0;
     };
     const onKey = (e: KeyboardEvent) => {
-      // Same rule as the HUD's shortcuts: never while typing (inputs, text areas, selects, editable text).
-      if (e.metaKey || e.ctrlKey || e.altKey || isTypingTarget(e.target)) return;
+      // Same rule as the HUD's shortcuts: never while typing (inputs, text areas, selects, editable text). Not a key a
+      // widget already used either (Home in a tab list or menu), nor one pressed behind the modal settings dialog.
+      if (e.metaKey || e.ctrlKey || e.altKey || e.defaultPrevented || isTypingTarget(e.target)) return;
+      if (useApp.getState().settingsOpen) return;
       if (e.key === "r" || e.key === "R" || e.key === "Home") useApp.getState().resetView();
     };
     el.addEventListener("wheel", onWheel, { passive: false });

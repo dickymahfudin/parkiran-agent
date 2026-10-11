@@ -1,11 +1,13 @@
 :root {
   color-scheme: dark;
   font-family: "Plus Jakarta Sans Variable", "Plus Jakarta Sans", system-ui, -apple-system, sans-serif;
-  --panel-bg: rgba(15, 17, 23, 0.68);
+  /* Panels sit over the daytime sky too. With this backing, --muted text keeps 4.7:1 over a bright sky and 4.3:1 even
+     over pure white (it was 2.9:1 and 2.6:1 at 0.68 with #9aa3ad). */
+  --panel-bg: rgba(15, 17, 23, 0.76);
   --panel-border: rgba(255, 255, 255, 0.09);
   --panel-shadow: 0 12px 32px rgba(0, 0, 0, 0.32), inset 0 1px 0 rgba(255, 255, 255, 0.05);
   --text: #eef1f5;
-  --muted: #9aa3ad;
+  --muted: #aeb6c0;
   --faint: rgba(255, 255, 255, 0.06);
   --accent: #5cc8ff;
   --needs: #ff8a3d;
@@ -509,6 +511,9 @@ h2 {
 .toolbar {
   top: 16px;
   right: 16px;
+  /* The panel blur makes the toolbar its own stacking context, so the time menu's z-index only counts in here: the
+     toolbar itself has to sit above the inspector the menu opens over. */
+  z-index: 2;
   display: flex;
   gap: 4px;
   align-items: center;
@@ -934,6 +939,8 @@ h2 {
   align-items: baseline;
   padding: 4px 4px 4px 2px;
   border-radius: var(--r-sm);
+}
+.feed-section li.fresh {
   animation: cue-in 0.4s ease-out;
 }
 .feed-section:first-child li:first-child {
@@ -1393,7 +1400,8 @@ kbd {
     right: 12px;
     width: auto;
     top: auto;
-    bottom: 64px;
+    /* Above the toolbar, which wraps to two rows (80 px) on a 375 px phone. */
+    bottom: 100px;
     height: auto;
     min-height: 0;
     max-height: 50%;
@@ -1401,6 +1409,11 @@ kbd {
   }
   .inspector.session-open > header {
     display: none;
+  }
+  /* The sheet covers the banner's usual spot: while it is open, what needs you shows at the top, over the session list. */
+  .hud:has(.inspector.session-open) .attention {
+    top: 12px;
+    bottom: auto;
   }
 }
 

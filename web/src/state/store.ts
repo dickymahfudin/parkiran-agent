@@ -76,6 +76,12 @@ function saveSettings(settings: Settings): void {
   }
 }
 
+/** The selected session left (ended, or gone after a reconnect): its tab would only say "click a person", so the
+ * inspector goes back to the events, as closing the session does. A tab picked with nothing selected stays. */
+function tabAfterSync(state: Pick<AppState, "selectedId" | "inspectorTab">, selectedId: string | null): InspectorTab {
+  return state.selectedId !== null && selectedId === null ? "events" : state.inspectorTab;
+}
+
 function urlTime(raw: string | null): string | null {
   if (raw === null) return null;
   if (isClockTime(raw)) return raw;
@@ -207,12 +213,14 @@ export const useApp = create<AppState>((set) => ({
         case "hello": {
           // A reconnect or a server restart: whatever the old world had selected or acknowledged may be gone.
           const sessions = Object.fromEntries(msg.sessions.map((s) => [s.id, s]));
+          const selectedId = keepSelection(state.selectedId, sessions);
           return {
             clockOffset,
             config: msg.config,
             usage: msg.usage,
             sessions,
-            selectedId: keepSelection(state.selectedId, sessions),
+            selectedId,
+            inspectorTab: tabAfterSync(state, selectedId),
             acknowledged: pruneAcknowledged(state.acknowledged, sessions),
             twins: assignTwinNumbers(state.twins, msg.sessions),
           };
@@ -221,10 +229,12 @@ export const useApp = create<AppState>((set) => ({
           const sessions = { ...state.sessions };
           for (const s of msg.updated) sessions[s.id] = s;
           for (const id of msg.removed) delete sessions[id];
+          const selectedId = keepSelection(state.selectedId, sessions);
           return {
             clockOffset,
             sessions,
-            selectedId: keepSelection(state.selectedId, sessions),
+            selectedId,
+            inspectorTab: tabAfterSync(state, selectedId),
             acknowledged: msg.removed.length > 0 ? pruneAcknowledged(state.acknowledged, sessions) : state.acknowledged,
             twins: assignTwinNumbers(state.twins, Object.values(sessions)),
           };

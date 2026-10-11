@@ -4,11 +4,12 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { IngestEvent } from "../../shared/src/events.ts";
 import type { ServerMessage } from "../../shared/src/protocol.ts";
+import { reduce, tick } from "../../shared/src/reducer.ts";
 import { DEFAULT_REDUCER_CONFIG } from "../../shared/src/session.ts";
 import { createApp } from "../src/app.ts";
 import { ConfigError, loadServerConfig, type ServerConfig } from "../src/config.ts";
 import { ReorderBuffer } from "../src/reorder.ts";
-import { SessionStore } from "../src/store.ts";
+import { type Reducer, SessionStore } from "../src/store.ts";
 import { NoUsageSource } from "../src/usage.ts";
 
 const TOKEN = "t".repeat(64);
@@ -119,6 +120,99 @@ describe("WebSocket /ws", () => {
     }
     expect(messages.find((m) => m.type === "cues")).toMatchObject({ cues: [{ kind: "arrived" }] });
     ws.close();
+  });
+
+  test("a client that sends more than 1 KB is cut off (the feed is read-only)", async () => {
+    const ws = open(ORIGIN);
+    await new Promise<void>((resolve, reject) => {
+      ws.onopen = () => resolve();
+      ws.onerror = () => reject(new Error("ws error"));
+    });
+    const closed = new Promise<boolean>((resolve) => {
+      ws.onclose = () => resolve(true);
+      setTimeout(() => resolve(false), 2000);
+    });
+    ws.send("x".repeat(2048));
+    expect(await closed).toBe(true);
+  });
+});
+
+describe("SessionStore", () => {
+  const at = Date.now();
+  const flushed = (s: SessionStore, ...events: IngestEvent[]) => {
+    for (const e of events) s.ingest(e, at);
+    s.flush(at + 10_000);
+  };
+
+  test("an event the reducer throws on is dropped and logged; the rest of the batch still lands", () => {
+    const logs: string[] = [];
+    const bad = event({ sessionId: nextSession(), ts: at - 3 });
+    const fragile: Reducer = {
+      tick,
+      reduce: (world, ev, cfg) => {
+        if (ev.sessionId === bad.sessionId) throw new Error("odd payload");
+        return reduce(world, ev, cfg);
+      },
+    };
+    const s = new SessionStore(DEFAULT_REDUCER_CONFIG, (m) => logs.push(m), fragile);
+    const good = [event({ ts: at - 5 }), event({ ts: at - 1 })];
+    flushed(s, good[0]!, bad, good[1]!);
+    expect(
+      s
+        .sessions()
+        .map((x) => x.id)
+        .sort(),
+    ).toEqual(good.map((e) => e.sessionId).sort());
+    expect(logs).toHaveLength(1);
+    expect(logs[0]).toContain(`dropping UserPromptSubmit for ${bad.sessionId.slice(0, 8)}`);
+    expect(logs[0]).toContain("odd payload");
+  });
+
+  test("a failing tick keeps the world, logs once a minute, and the next good tick carries on", () => {
+    const logs: string[] = [];
+    let broken = true;
+    const flaky: Reducer = {
+      reduce,
+      tick: (world, now, cfg) => {
+        if (broken) throw new Error("tick bug");
+        return tick(world, now, cfg);
+      },
+    };
+    const s = new SessionStore(DEFAULT_REDUCER_CONFIG, (m) => logs.push(m), flaky);
+    flushed(s, event({ ts: at - 1, event: "Stop" }));
+    expect(() => s.tick(at + 20_000)).not.toThrow();
+    s.tick(at + 21_000);
+    expect(logs).toHaveLength(1);
+    s.tick(at + 80_001);
+    expect(logs).toHaveLength(2);
+    broken = false;
+    s.tick(at + DEFAULT_REDUCER_CONFIG.idleMs);
+    expect(s.sessions()[0]).toMatchObject({ dozing: true });
+  });
+
+  test("a listener that throws does not stop the others", () => {
+    const logs: string[] = [];
+    const s = new SessionStore(DEFAULT_REDUCER_CONFIG, (m) => logs.push(m));
+    const seen: number[] = [];
+    s.onChange(() => {
+      throw new Error("listener bug");
+    });
+    s.onChange((c) => seen.push(c.updated.length));
+    expect(() => flushed(s, event())).not.toThrow();
+    expect(seen).toEqual([1]);
+    expect(logs[0]).toContain("a change listener threw");
+  });
+
+  test("past 64 sessions, events for new ones are dropped and logged; known ones still update", () => {
+    const logs: string[] = [];
+    const s = new SessionStore(DEFAULT_REDUCER_CONFIG, (m) => logs.push(m));
+    const first = event({ ts: at - 100 });
+    flushed(s, first, ...Array.from({ length: 63 }, (_, i) => event({ ts: at - 99 + i })));
+    expect(s.sessions()).toHaveLength(64);
+    flushed(s, event({ ts: at - 5 }), { ...first, event: "Stop", ts: at - 4 });
+    expect(s.sessions()).toHaveLength(64);
+    expect(s.sessions().find((x) => x.id === first.sessionId)).toMatchObject({ phase: "idle" });
+    expect(logs.filter((m) => m.includes("64 sessions already tracked"))).toHaveLength(1);
   });
 });
 

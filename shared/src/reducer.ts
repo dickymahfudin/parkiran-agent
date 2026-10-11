@@ -418,7 +418,7 @@ function trimOpenTools(s: Session): void {
   for (const [id] of entries.slice(0, entries.length - MAX_OPEN_TOOLS)) delete s.openTools[id];
 }
 
-/** Pure: time-based transitions (dozing, reaping, removal after the exit walk, stale friends). */
+/** Pure: time-based transitions (stalled turns, dozing, reaping, removal after the exit walk, stale friends). */
 export function tick(world: World, now: number, config: ReducerConfig = DEFAULT_REDUCER_CONFIG): ReduceResult {
   const cues: Cue[] = [];
   let changed = false;
@@ -445,6 +445,22 @@ export function tick(world: World, now: number, config: ReducerConfig = DEFAULT_
       for (const sub of Object.keys(e.subagents)) cues.push({ kind: "friendLeft", sessionId: id, agentId: sub });
       e.subagents = {};
       cues.push({ kind: "leaving", sessionId: id });
+    }
+    // A turn can end without a Stop: Esc, a crash or a closed lid fire no hook, and the person would type on until the
+    // reap. Nothing heard for a while, no tool open and no friend out means the turn is over.
+    if (
+      s.phase === "working" &&
+      s.need === null &&
+      now - s.lastEventAt >= config.stallMs &&
+      Object.keys(s.openTools).length === 0 &&
+      Object.keys(s.subagents).length === 0
+    ) {
+      const e = edit();
+      e.phase = "idle";
+      e.work = "think";
+      e.currentTool = null;
+      // The work ended with the last event, not now: the quiet minutes count as idle (no false "worked 1h").
+      recordState(e, e.lastEventAt);
     }
     if (s.phase === "idle" && !s.dozing && now - s.lastEventAt >= config.idleMs) {
       edit().dozing = true;

@@ -112,6 +112,8 @@ export interface ReducerConfig {
   leaveMs: number;
   /** Friend without events this long → leaves (SubagentStop may never come). */
   subagentStaleMs: number;
+  /** Working without events this long, with no tool open and no friend out → the turn ended unseen (Esc, a crash). */
+  stallMs: number;
   /** A new tool starting this long after an unanswered permission means it was denied with feedback. */
   denyAfterNewToolMs: number;
 }
@@ -121,6 +123,7 @@ export const DEFAULT_REDUCER_CONFIG: ReducerConfig = {
   reapMs: 12 * 60 * 60_000,
   leaveMs: 12_000,
   subagentStaleMs: 30 * 60_000,
+  stallMs: 15 * 60_000,
   denyAfterNewToolMs: 500,
 };
 

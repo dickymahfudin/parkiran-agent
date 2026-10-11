@@ -36,7 +36,7 @@ const panelId = (tab: InspectorTab) => `inspector-panel-${tab}`;
  * the events show again. A selected session still opens over a folded inspector, as the detail panel did.
  */
 /** Phone width (the same 720 px breakpoint as styles.css): there is no event feed there, only the session sheet. */
-const PHONE_QUERY = "(max-width: 720px)";
+export const PHONE_QUERY = "(max-width: 720px)";
 
 function usePhoneWidth(): boolean {
   const [phone, setPhone] = useState(() => typeof matchMedia !== "undefined" && matchMedia(PHONE_QUERY).matches);
@@ -102,7 +102,9 @@ export function Inspector({ now, onCloseSession }: { now: number; onCloseSession
               ? TABS.length - 1
               : -1;
     if (to < 0) return;
+    // Home here moves between the tabs; it must not reach the camera's Home (reset view, which clears the selection).
     e.preventDefault();
+    e.stopPropagation();
     pick(TABS[to]!.id);
     tabs.current?.querySelector<HTMLElement>(`#${tabId(TABS[to]!.id)}`)?.focus();
   };
@@ -178,6 +180,14 @@ function EventFeed({ now, filter, onFilter }: { now: number; filter: FeedFilter;
   const sections = groupFeed(cueLog, now, sessions, filter === "attention");
   const nameOf = (id: string) => (sessions[id] ? sessionName(sessions[id], twins) : shortId(id));
   const seenLabels = new Map<string, number>();
+  // Lines remount when their minute bucket changes ("2 min ago" → "3 min ago") or a run splits across two buckets.
+  // Only news slides in: a line whose newest cue arrived after the last render. Opening the feed animates nothing.
+  const newest = cueLog[0]?.seq ?? 0;
+  const shownUpTo = useRef(newest);
+  const before = shownUpTo.current;
+  useEffect(() => {
+    shownUpTo.current = Math.max(shownUpTo.current, newest);
+  }, [newest]);
   return (
     <>
       <div className="feed-tools">
@@ -211,7 +221,7 @@ function EventFeed({ now, filter, onFilter }: { now: number; filter: FeedFilter;
                 <h3 className="feed-bucket">{sec.label}</h3>
                 <ol>
                   {sec.groups.map((g) => (
-                    <FeedLine key={g.key} g={g} now={now} subject={feedSubject(g, nameOf)} names={g.sessionIds.map(nameOf)} />
+                    <FeedLine key={g.key} g={g} news={g.key > before} now={now} subject={feedSubject(g, nameOf)} names={g.sessionIds.map(nameOf)} />
                   ))}
                 </ol>
               </section>
@@ -223,9 +233,11 @@ function EventFeed({ now, filter, onFilter }: { now: number; filter: FeedFilter;
   );
 }
 
-function FeedLine({ g, now, subject, names }: { g: FeedGroup; now: number; subject: string; names: string[] }) {
+function FeedLine({ g, news, now, subject, names }: { g: FeedGroup; news: boolean; now: number; subject: string; names: string[] }) {
+  // Decided once per mount: later renders of the same line keep the class, so its animation is never cut short.
+  const [fresh] = useState(news);
   return (
-    <li className={`mood-${g.line.mood}`}>
+    <li className={`mood-${g.line.mood}${fresh ? " fresh" : ""}`}>
       <span className="cue-icon" aria-hidden="true">
         <Icon name={g.line.icon} />
       </span>

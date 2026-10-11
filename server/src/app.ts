@@ -85,6 +85,12 @@ export function createApp({ config, store, usage, log }: AppDeps) {
       }
     },
     websocket: {
+      // Clients only listen: anything they send is a mistake or abuse, so the 16 MB default shrinks to 1 KB (this
+      // limits incoming frames only; the hello going out can be much larger).
+      maxPayloadLength: 1024,
+      // A tab too frozen to read gets closed instead of silently missing the deltas publish drops for it; it
+      // reconnects and starts again from a fresh hello.
+      closeOnBackpressureLimit: true,
       open(ws) {
         ws.subscribe(TOPIC);
         send(ws, {

@@ -350,6 +350,34 @@ describe("timers (tick)", () => {
     expect(session(tick(world, cfg.idleMs * 2, cfg).world).dozing).toBe(false);
   });
 
+  test("a turn that ends without a Stop (Esc, a crash) goes idle after the stall time, then dozes", () => {
+    const { world } = run([
+      ev("UserPromptSubmit", 0),
+      ev("PreToolUse", 10, { toolName: "Read", toolUseId: "t" }),
+      ev("PostToolUse", 20, { toolName: "Read", toolUseId: "t" }),
+    ]);
+    expect(session(tick(world, 20 + cfg.stallMs - 1, cfg).world).phase).toBe("working");
+    const stalled = tick(world, 20 + cfg.stallMs, cfg);
+    expect(session(stalled.world)).toMatchObject({ phase: "idle", currentTool: null });
+    // No ting: nothing finished that anyone saw.
+    expect(stalled.cues).toEqual([]);
+    // The quiet minutes are idle on the strip and never count as work.
+    expect(session(stalled.world).timeline.at(-1)).toEqual({ state: "idle", at: 20 });
+    expect(session(stalled.world).workedMs).toBe(20);
+    expect(kinds(tick(stalled.world, 20 + cfg.idleMs, cfg).cues)).toEqual(["dozeStarted"]);
+    // The next prompt picks the turn up as usual.
+    expect(session(run([ev("UserPromptSubmit", 30 + cfg.stallMs)], stalled.world).world).phase).toBe("working");
+  });
+
+  test("an open tool, a friend out or a question keeps a quiet turn working", () => {
+    const tool = run([ev("UserPromptSubmit", 0), ev("PreToolUse", 10, { toolName: "Bash", toolUseId: "t" })]).world;
+    expect(session(tick(tool, 10 + cfg.stallMs, cfg).world).phase).toBe("working");
+    const friend = run([ev("UserPromptSubmit", 0), ev("SubagentStart", 10, { agentId: "a1", agentType: "Explore" })]).world;
+    expect(session(tick(friend, 10 + cfg.stallMs, cfg).world).phase).toBe("working");
+    const asking = run([ev("UserPromptSubmit", 0), ev("Notification", 10, { notificationType: "permission_prompt" })]).world;
+    expect(session(tick(asking, 10 + cfg.stallMs, cfg).world).phase).toBe("waiting");
+  });
+
   test("no events for the reap window → walks away", () => {
     const { world } = run([ev("SessionStart", 0)]);
     const reaped = tick(world, cfg.reapMs, cfg);
@@ -425,6 +453,8 @@ describe("insights (timeline, tool mix, waiting, milestones)", () => {
     const events: IngestEvent[] = [ev("UserPromptSubmit", 0)];
     for (let i = 0; i < 101; i++) events.push(...tool("Read", 10 + i * 10, `c${i}`));
     events.push(ev("PreCompact", 5000), ev("PostCompact", 6000), ev("PreCompact", 7000), ev("PostCompact", 8000));
+    // A long build keeps the turn working through the hour without a single event (a silent turn would stall to idle).
+    events.push(ev("PreToolUse", 9000, { toolName: "Bash", toolUseId: "build" }));
     const { world, cues } = run(events);
     const milestones = cues.filter((c) => c.kind === "milestone");
     expect(milestones).toEqual([

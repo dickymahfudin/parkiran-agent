@@ -234,7 +234,16 @@ function DeveloperSettings() {
             }}
           />
         </label>
-        <button type="button" className="setting-live" disabled={timeOverride === null} onClick={() => st.setTimeOverride(null)}>
+        <button
+          type="button"
+          className="setting-live"
+          disabled={timeOverride === null}
+          onClick={(e) => {
+            // The button disables itself: hand the focus to the time input first, or it would drop out of the dialog.
+            e.currentTarget.parentElement?.querySelector("input")?.focus();
+            st.setTimeOverride(null);
+          }}
+        >
           Live
         </button>
       </div>

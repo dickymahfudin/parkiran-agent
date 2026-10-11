@@ -1,5 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import type { PublicSession } from "../../../shared/src/protocol.ts";
+import { useApp } from "../state/store.ts";
+import { runNotifier } from "./loop.ts";
 import { createNotifier } from "./notifierCore.ts";
 import { CHIME_EVERY_MS, NOTIFY_EVERY_MS } from "./rules.ts";
 
@@ -98,5 +100,27 @@ describe("createNotifier", () => {
     for (let t = 1000; t < 1000 + 5 * CHIME_EVERY_MS; t += 1000)
       n.tick({ sessions, acknowledged: {}, clockOffset: 0, notificationsEnabled: false, chimeEveryMs: null }, t);
     expect(chimes).toBe(1);
+  });
+});
+
+describe("runNotifier", () => {
+  test("a need arriving over the socket chimes at once, not on the next (possibly throttled) timer tick", () => {
+    let chimes = 0;
+    const stop = runNotifier({ chime: () => chimes++, notify: () => null });
+    try {
+      const now = Date.now();
+      useApp.getState().apply({
+        type: "hello",
+        serverTime: now,
+        config: { lat: -6.2, lon: 106.8, idleMinutes: 30 },
+        sessions: [session("calm", null)],
+        usage: { available: false, reason: "n/a" },
+      });
+      expect(chimes).toBe(0);
+      useApp.getState().apply({ type: "sessions", serverTime: now, updated: [session("calm", now)], removed: [] });
+      expect(chimes).toBe(1);
+    } finally {
+      stop();
+    }
   });
 });
